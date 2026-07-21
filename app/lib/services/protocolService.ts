@@ -2,10 +2,13 @@ import type { Protocol, ProtocolItem } from '../types/database';
 
 export function createProtocol(initial: Partial<Protocol>): Protocol {
   return {
-    id: `proto-${Date.now()}`,
+    id: initial.id ?? `proto-${Date.now()}`,
     clientName: initial.clientName ?? 'Cliente',
+    clientCnpj: initial.clientCnpj,
+    isNewClient: initial.isNewClient,
+    title: initial.title ?? '',
     status: initial.status ?? 'draft',
-    createdAt: new Date().toISOString(),
+    createdAt: initial.createdAt ?? new Date().toISOString(),
     updatedAt: new Date().toISOString(),
     items: initial.items ?? [],
     totals: initial.totals ?? { subtotal: 0, markup: 0, total: 0 },
@@ -15,14 +18,35 @@ export function createProtocol(initial: Partial<Protocol>): Protocol {
 export function addItemToProtocol(protocol: Protocol, item: ProtocolItem): Protocol {
   return {
     ...protocol,
-    items: [...protocol.items, item],
+    items: [...(protocol.items || []), item],
   };
 }
 
+/**
+ * Calculates totals considering the new item structure.
+ * - Items with salePrice use that directly.
+ * - Items in stock use costPrice * (1 + markup/100).
+ * - Items without pricing contribute R$ 0.
+ */
 export function calculateTotals(items: ProtocolItem[]) {
-  const subtotal = items.reduce((sum, item) => sum + item.unitPrice * item.quantity, 0);
-  const markup = subtotal * 0.3;
-  const total = subtotal + markup;
+  let totalEstoque = 0;
+  let totalACotar = 0;
 
-  return { subtotal, markup, total };
+  for (const item of items) {
+    if (item.type === 'estoque') {
+      const cost = item.costPrice ?? item.unitPrice ?? 0;
+      const markup = item.markupPercent ?? 70;
+      const sale = cost * (1 + markup / 100) * item.quantity;
+      totalEstoque += sale;
+    } else {
+      // a_cotar
+      const sale = (item.salePrice ?? 0) * item.quantity;
+      totalACotar += sale;
+    }
+  }
+
+  const subtotal = totalEstoque + totalACotar;
+  const total = subtotal; // markup already baked into each item
+
+  return { subtotal, markup: 0, total, totalEstoque, totalACotar };
 }

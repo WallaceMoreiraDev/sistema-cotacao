@@ -1,20 +1,15 @@
 'use client';
 
 import { useState, type FormEvent } from 'react';
-import { useRouter } from 'next/navigation';
-import { useAuth } from '../../context/AuthContext';
-
-type LoginRole = 'admin' | 'funcionario';
+import { login } from '../../lib/actions/auth';
 
 export default function LoginPage() {
-  const router = useRouter();
-  const { login } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [role, setRole] = useState<LoginRole>('funcionario');
   const [error, setError] = useState('');
+  const [isPending, setIsPending] = useState(false);
 
-  const handleSubmit = (event: FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     setError('');
 
@@ -30,132 +25,127 @@ export default function LoginPage() {
       return;
     }
 
-    login({
-      name: role === 'admin' ? 'Admin' : 'Tiago',
-      role,
-    });
-    router.push('/dashboard');
+    setIsPending(true);
+
+    const formData = new FormData();
+    formData.append('email', normalizedEmail);
+    formData.append('password', password);
+
+    try {
+      const result = await login(formData);
+
+      // If we got here and there's a result with an error, show it.
+      // If it's successful, the server action will redirect and this code might not run.
+      if (result?.error) {
+        setError(result.error);
+        setIsPending(false);
+      }
+    } catch (err) {
+      // In Next.js, redirect() throws a special error. We shouldn't catch it and treat it as a UI error.
+      // However, to be safe, if it's a generic error we display it.
+      if (err instanceof Error && err.message !== 'NEXT_REDIRECT') {
+        setError('Ocorreu um erro inesperado ao tentar entrar.');
+        setIsPending(false);
+      }
+    }
   };
 
   return (
-    <main className="min-h-screen bg-[radial-gradient(circle_at_top_left,_rgba(15,23,42,0.95),_rgba(2,6,23,0.98))] px-4 py-8 text-slate-900 sm:px-6 lg:px-8">
-      <div className="mx-auto flex min-h-[calc(100vh-4rem)] max-w-6xl overflow-hidden rounded-[32px] border border-slate-200/70 bg-white shadow-[0_30px_90px_rgba(15,23,42,0.22)]">
-        <section className="hidden flex-1 flex-col justify-between bg-white p-10 lg:flex">
-          <div className="flex h-full items-center justify-center">
-            <div className="w-full max-w-sm rounded-[24px] border border-slate-200 bg-slate-50 p-8 shadow-sm">
-              <div className="h-2.5 w-20 rounded-full bg-[#F7C00C]" />
-              <h1 className="mt-6 text-3xl font-semibold text-slate-900">
-                Gestão de protocolos
-              </h1>
-              <p className="mt-3 text-sm leading-7 text-slate-600">
-                Ambiente interno para organização, revisão e acompanhamento dos processos comerciais.
-              </p>
-            </div>
+    <main className="flex min-h-screen flex-col items-center justify-center bg-slate-950 bg-[radial-gradient(ellipse_80%_80%_at_50%_-20%,rgba(120,119,198,0.15),rgba(255,255,255,0))] px-4 py-12 sm:px-6 lg:px-8">
+      <div className="w-full max-w-md">
+        {/* Main Login Card */}
+        <div className="rounded-[28px] border border-slate-200/80 bg-white p-8 shadow-[0_25px_60px_rgba(15,23,42,0.3)] sm:p-10">
+          <div className="mb-8 text-center">
+            <img
+              src="/images/logo_fm.png"
+              alt="Força Máxima Vedações"
+              className="mx-auto h-20 w-auto object-contain mix-blend-multiply mb-4"
+            />
+            <span className="text-xs font-bold uppercase tracking-[0.25em] text-slate-400 block">
+              Sistema Interno
+            </span>
+            <h1 className="mt-2 text-2xl font-bold text-slate-900 sm:text-3xl">
+              Acesso ao Painel
+            </h1>
+            <p className="mt-2 text-sm leading-relaxed text-slate-500">
+              Entre com suas credenciais para gerenciar protocolos e cotações.
+            </p>
           </div>
-        </section>
 
-        <section className="flex-1 p-8 sm:p-10 lg:p-12">
-          <div className="mx-auto flex h-full max-w-md flex-col justify-center">
-            <div className="mb-8">
-              <p className="text-sm font-semibold uppercase tracking-[0.35em] text-slate-500">
-                Acesso ao painel
-              </p>
-              <h2 className="mt-3 text-3xl font-semibold text-slate-900">Entrar no sistema</h2>
-              <p className="mt-3 text-sm leading-6 text-slate-600">
-                Acesse o ambiente de protocolos com e-mail e senha para continuar o fluxo de trabalho.
-              </p>
+          {/* Login Form */}
+          <form className="space-y-4" onSubmit={handleSubmit}>
+            <div>
+              <label htmlFor="email" className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-700">
+                E-mail corporativo
+              </label>
+              <input
+                id="email"
+                type="email"
+                value={email}
+                onChange={(event) => setEmail(event.target.value)}
+                placeholder="seu.email@empresa.com"
+                disabled={isPending}
+                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:bg-white focus:ring-2 focus:ring-slate-900/10 disabled:opacity-50"
+              />
             </div>
 
-            <div className="mb-6 grid gap-3 sm:grid-cols-2">
-              <button
-                type="button"
-                onClick={() => setRole('funcionario')}
-                className={`rounded-2xl border px-4 py-3 text-left transition ${
-                  role === 'funcionario'
-                    ? 'border-slate-900 bg-slate-900 text-white shadow-sm'
-                    : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50'
-                }`}
-              >
-                <p className="text-xs uppercase tracking-[0.3em] opacity-70">Funcionário</p>
-                <p className="mt-1 font-semibold">Tiago</p>
-              </button>
-
-              <button
-                type="button"
-                onClick={() => setRole('admin')}
-                className={`rounded-2xl border px-4 py-3 text-left transition ${
-                  role === 'admin'
-                    ? 'border-slate-900 bg-slate-900 text-white shadow-sm'
-                    : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50'
-                }`}
-              >
-                <p className="text-xs uppercase tracking-[0.3em] opacity-70">Administrador</p>
-                <p className="mt-1 font-semibold">Admin</p>
-              </button>
+            <div>
+              <label htmlFor="password" className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-700">
+                Senha
+              </label>
+              <input
+                id="password"
+                type="password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+                placeholder="••••••••"
+                disabled={isPending}
+                className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:bg-white focus:ring-2 focus:ring-slate-900/10 disabled:opacity-50"
+              />
             </div>
 
-            <form className="space-y-5" onSubmit={handleSubmit}>
-              <div>
-                <label htmlFor="email" className="mb-2 block text-sm font-medium text-slate-700">
-                  E-mail
-                </label>
-                <input
-                  id="email"
-                  type="email"
-                  value={email}
-                  onChange={(event) => setEmail(event.target.value)}
-                  placeholder="seu@email.com"
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:bg-white"
-                />
+            {error ? (
+              <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
+                {error}
               </div>
+            ) : null}
 
-              <div>
-                <label htmlFor="password" className="mb-2 block text-sm font-medium text-slate-700">
-                  Senha
-                </label>
-                <input
-                  id="password"
-                  type="password"
-                  value={password}
-                  onChange={(event) => setPassword(event.target.value)}
-                  placeholder="Digite sua senha"
-                  className="w-full rounded-2xl border border-slate-200 bg-slate-50 px-4 py-3 text-sm text-slate-800 outline-none transition focus:border-slate-400 focus:bg-white"
-                />
-              </div>
-
-              {error ? (
-                <div className="rounded-2xl border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-700">
-                  {error}
-                </div>
-              ) : null}
-
-              <div className="flex items-center justify-between text-sm text-slate-500">
-                <label className="flex items-center gap-2">
-                  <input type="checkbox" className="h-4 w-4 rounded border-slate-300" />
-                  Manter conectado
-                </label>
-                <a href="#" className="font-medium text-slate-700 hover:text-slate-950">
-                  Esqueci a senha
-                </a>
-              </div>
-
-              <button
-                type="submit"
-                className="w-full rounded-2xl bg-slate-900 px-4 py-3 text-sm font-semibold text-white shadow-lg shadow-slate-900/20 transition hover:bg-slate-800"
-              >
-                Entrar no painel
-              </button>
-            </form>
-
-            <div className="mt-6 rounded-2xl border border-slate-200 bg-slate-50 p-4 text-sm text-slate-600">
-              <p className="font-semibold text-slate-800">Acesso de demonstração</p>
-              <p className="mt-1">
-                Utilize qualquer e-mail válido e uma senha com pelo menos 6 caracteres para continuar.
-              </p>
+            <div className="flex items-center text-xs text-slate-500 pt-1">
+              <label className="flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" className="h-4 w-4 rounded border-slate-300 text-slate-900 focus:ring-slate-900" />
+                <span>Lembrar meu acesso</span>
+              </label>
             </div>
+
+            <button
+              type="submit"
+              disabled={isPending}
+              className="mt-2 w-full rounded-2xl bg-slate-900 px-4 py-3.5 text-sm font-semibold text-white shadow-lg shadow-slate-900/20 transition-all hover:bg-slate-800 focus:outline-none focus:ring-2 focus:ring-slate-900 focus:ring-offset-2 disabled:opacity-70 flex justify-center items-center"
+            >
+              {isPending ? 'Entrando...' : 'Entrar no sistema'}
+            </button>
+          </form>
+
+          {/* Professional Corporate Security Footer */}
+          <div className="mt-8 border-t border-slate-100 pt-6 text-center text-xs text-slate-400">
+            <p className="flex items-center justify-center gap-1.5 font-medium text-slate-500">
+              <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+              </svg>
+              Acesso Corporativo Restrito
+            </p>
+            <p className="mt-1 text-[11px] text-slate-400">
+              Para suporte ou solicitação de novos acessos, contate a TI interna.
+            </p>
           </div>
-        </section>
+        </div>
+
+        {/* Footer Credit */}
+        <p className="mt-6 text-center text-xs text-slate-500">
+          Força Máxima Vedações &copy; {new Date().getFullYear()}
+        </p>
       </div>
     </main>
   );
 }
+

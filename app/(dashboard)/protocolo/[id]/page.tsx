@@ -1,9 +1,10 @@
 'use client';
 
-import { useMemo } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { useLocalStorage } from '../../../hooks/useLocalStorage';
 import { calculateTotals } from '../../../lib/services/protocolService';
+import { getProtocolByIdAction } from '../../../lib/actions/protocols';
 import type { Protocol } from '../../../lib/types/database';
 
 const STORAGE_KEY = 'protocols';
@@ -11,11 +12,24 @@ const STORAGE_KEY = 'protocols';
 export default function ProtocolDetailPage() {
   const params = useParams<{ id: string }>();
   const [protocols] = useLocalStorage<Protocol[]>(STORAGE_KEY, []);
-  const protocol = useMemo(() => protocols.find((item) => item.id === params.id) ?? null, [params.id, protocols]);
+  const [dbProtocol, setDbProtocol] = useState<Protocol | null>(null);
+
+  useEffect(() => {
+    if (params.id) {
+      getProtocolByIdAction(params.id).then((res) => {
+        if (res.success && res.data) {
+          setDbProtocol(res.data);
+        }
+      });
+    }
+  }, [params.id]);
+
+  const localProtocol = useMemo(() => protocols.find((item) => item.id === params.id) ?? null, [params.id, protocols]);
+  const protocol = dbProtocol || localProtocol;
 
   const totals = useMemo(() => {
     if (!protocol) return { subtotal: 0, markup: 0, total: 0 };
-    return calculateTotals(protocol.items);
+    return calculateTotals(protocol.items || []);
   }, [protocol]);
 
   if (!protocol) {
@@ -34,10 +48,10 @@ export default function ProtocolDetailPage() {
       <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm">
         <h2 className="text-lg font-semibold text-slate-900">Itens</h2>
         <div className="mt-4 space-y-3">
-          {protocol.items.map((item) => (
+          {(protocol.items || []).map((item) => (
             <div key={item.id} className="rounded-xl border border-slate-200 p-4">
               <p className="font-medium text-slate-900">{item.name}</p>
-              <p className="mt-1 text-sm text-slate-500">{item.oemCode} · {item.nickname}</p>
+              <p className="mt-1 text-sm text-slate-500">{item.oem} · {item.nickname}</p>
             </div>
           ))}
         </div>
