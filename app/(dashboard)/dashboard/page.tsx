@@ -11,6 +11,7 @@ import type { Protocol } from '../../lib/types/database';
 export default function DashboardPage() {
   const { user } = useAuth();
   const [protocols, setProtocols] = useState<Protocol[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<'geral' | 'kanban'>('geral');
   const [filterClient, setFilterClient] = useState('');
   const [filterProtocol, setFilterProtocol] = useState('');
@@ -157,10 +158,12 @@ export default function DashboardPage() {
   // Load protocols from Supabase on mount
   useEffect(() => {
     async function loadFromSupabase() {
+      setIsLoading(true);
       const res = await getProtocolsAction();
       if (res.success && res.data && res.data.length > 0) {
         setProtocols(res.data);
       }
+      setIsLoading(false);
     }
     loadFromSupabase();
   }, [setProtocols]);
@@ -316,7 +319,15 @@ export default function DashboardPage() {
             </span>
           </div>
 
-          {filteredProtocols.length === 0 ? (
+          {isLoading ? (
+            <div className="p-12 text-center flex flex-col items-center">
+              <svg className="h-8 w-8 animate-spin text-[#F7C00C]" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+              </svg>
+              <p className="mt-4 text-sm font-semibold text-slate-700">Carregando protocolos...</p>
+            </div>
+          ) : filteredProtocols.length === 0 ? (
             <div className="p-12 text-center">
               <svg className="mx-auto h-12 w-12 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
@@ -414,6 +425,15 @@ export default function DashboardPage() {
 
       {/* Tab Content 2: ABA KANBAN (INTERATIVO) */}
       {activeTab === 'kanban' && (
+        isLoading ? (
+          <div className="rounded-[24px] border border-slate-200/80 bg-white p-12 text-center flex flex-col items-center">
+            <svg className="h-8 w-8 animate-spin text-[#F7C00C]" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+            </svg>
+            <p className="mt-4 text-sm font-semibold text-slate-700">Carregando painel...</p>
+          </div>
+        ) : (
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
           {kanbanColumns.map((col) => (
             <div
@@ -488,6 +508,7 @@ export default function DashboardPage() {
             </div>
           ))}
         </div>
+        )
       )}
     </section>
   );

@@ -283,7 +283,7 @@ export async function deleteProtocolAction(id: string): Promise<{ success: boole
  * Gets a map of product code -> total reserved quantity across active protocols.
  * Active protocols are those that are not 'draft' (Rascunho) and not 'approved' (Finalizado).
  */
-export async function getReservedStockAction(): Promise<Record<string, number>> {
+export async function getReservedStockAction(excludeProtocolId?: number): Promise<Record<string, number>> {
   try {
     const supabase = await createClient();
 
@@ -303,11 +303,17 @@ export async function getReservedStockAction(): Promise<Record<string, number>> 
     const protocolIds = activeProtocols.map(p => p.id);
 
     // 2. Get items of these protocols
-    const { data: items, error: itemsError } = await supabase
+    let query = supabase
       .from('protocol_items')
       .select('code, oem, name, quantity, type')
       .in('protocol_id', protocolIds)
       .eq('type', 'estoque'); // only care about stock items
+
+    if (excludeProtocolId) {
+      query = query.neq('protocol_id', excludeProtocolId);
+    }
+
+    const { data: items, error: itemsError } = await query;
 
     if (itemsError || !items) {
       return {};
