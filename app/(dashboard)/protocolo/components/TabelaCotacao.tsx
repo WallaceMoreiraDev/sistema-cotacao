@@ -82,12 +82,12 @@ export function TabelaCotacao({
 
                   {/* Middle: Medidas */}
                   <div className="flex flex-wrap items-center gap-2 md:justify-center">
-                    {item.measurements.dInt && <span className="px-2 py-1 bg-white border border-slate-200 rounded text-[10px] font-semibold text-slate-600">D. Interno: {formatMeasurement(item.measurements.dInt)}</span>}
-                    {item.measurements.dExt && <span className="px-2 py-1 bg-white border border-slate-200 rounded text-[10px] font-semibold text-slate-600">D. Externo: {formatMeasurement(item.measurements.dExt)}</span>}
-                    {item.measurements.a1 && <span className="px-2 py-1 bg-white border border-slate-200 rounded text-[10px] font-semibold text-slate-600">A1: {formatMeasurement(item.measurements.a1)}</span>}
-                    {item.measurements.a2 && <span className="px-2 py-1 bg-white border border-slate-200 rounded text-[10px] font-semibold text-slate-600">A2: {formatMeasurement(item.measurements.a2)}</span>}
-                    {item.measurements.esp && <span className="px-2 py-1 bg-white border border-slate-200 rounded text-[10px] font-semibold text-slate-600">Espessura: {formatMeasurement(item.measurements.esp)}</span>}
-                    {item.measurements.cs && <span className="px-2 py-1 bg-white border border-slate-200 rounded text-[10px] font-semibold text-slate-600">C.S: {formatMeasurement(item.measurements.cs)}</span>}
+                    {item.measurements?.innerDiameter && <span className="px-2 py-1 bg-white border border-slate-200 rounded text-[10px] font-semibold text-slate-600">D. Interno: {formatMeasurement(item.measurements.innerDiameter)}</span>}
+                    {item.measurements?.outerDiameter && <span className="px-2 py-1 bg-white border border-slate-200 rounded text-[10px] font-semibold text-slate-600">D. Externo: {formatMeasurement(item.measurements.outerDiameter)}</span>}
+                    {item.measurements?.height1 && <span className="px-2 py-1 bg-white border border-slate-200 rounded text-[10px] font-semibold text-slate-600">A1: {formatMeasurement(item.measurements.height1)}</span>}
+                    {item.measurements?.height2 && <span className="px-2 py-1 bg-white border border-slate-200 rounded text-[10px] font-semibold text-slate-600">A2: {formatMeasurement(item.measurements.height2)}</span>}
+                    {item.measurements?.thickness && <span className="px-2 py-1 bg-white border border-slate-200 rounded text-[10px] font-semibold text-slate-600">Espessura: {formatMeasurement(item.measurements.thickness)}</span>}
+                    {item.measurements?.cs && <span className="px-2 py-1 bg-white border border-slate-200 rounded text-[10px] font-semibold text-slate-600">C.S: {formatMeasurement(item.measurements.cs)}</span>}
                   </div>
 
                   {/* Right: Quantidade e Ações */}
