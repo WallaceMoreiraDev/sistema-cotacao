@@ -2,6 +2,7 @@ import { useState } from 'react';
 import type { ProtocolItem } from '../../../lib/types/database';
 import type { SupplierRow } from '../../../lib/actions/suppliers';
 import { formatCurrency, formatMeasurement } from '../../../lib/utils/protocolFormatters';
+import { getDefaultMarkup } from '../../../lib/config/suppliers';
 
 interface TabelaCotacaoProps {
   items: ProtocolItem[];
@@ -174,7 +175,14 @@ export function TabelaCotacao({
                   <div className="flex flex-col md:flex-row items-end md:items-center gap-4 md:gap-6">
                     <div className="flex items-center gap-2">
                       <div className="flex flex-col items-end gap-1">
-                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Markup %</label>
+                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
+                          Markup %
+                          {item.chosenSupplierType && (
+                            <span className="text-[8px] font-normal text-slate-400 normal-case bg-slate-100 px-1 py-0.5 rounded" title={`Padrão para ${item.chosenSupplierType}`}>
+                              (Padrão: {getDefaultMarkup(item.chosenSupplierType)}%)
+                            </span>
+                          )}
+                        </label>
                         {(item.needsApproval || isRejected) && (
                           <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${isApproved ? 'bg-emerald-100 text-emerald-700' : isRejected ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>
                             {isApproved ? '✅ Aprovado' : isRejected ? '❌ Rejeitado' : '⚠️ Requer Aprovação'}

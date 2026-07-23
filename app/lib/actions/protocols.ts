@@ -659,15 +659,12 @@ export async function approveWithCustomMarkupAction(itemId: string, customMarkup
 
 export async function rejectItemAction(itemId: string, defaultMarkup: number, basePrice: number) {
   const supabase = await createClient();
-  const salePrice = basePrice * (1 + defaultMarkup / 100);
   
   const { error } = await supabase
     .from('protocol_items')
     .update({ 
       approval_status: 'rejected',
-      needs_approval: false,
-      markup_percent: defaultMarkup,
-      sale_price: salePrice
+      needs_approval: false
     })
     .eq('id', itemId);
 
