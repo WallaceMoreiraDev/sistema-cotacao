@@ -228,28 +228,32 @@ export async function saveProtocolAction(protocol: Protocol): Promise<{ success:
 
     // 3. Insert new items if any exist
     if (protocol.items && protocol.items.length > 0) {
-      const itemsToInsert = protocol.items.map((item) => ({
-        protocol_id: actualId,
-        id: crypto.randomUUID(),
-        name: item.name,
-        quantity: item.quantity,
-        unit_price: item.unitPrice ?? 0,
-        cost_price: item.costPrice ?? 0,
-        type: item.type ?? 'estoque',
-        status: item.status ?? 'pendente',
-        oem: item.oem || null,
-        nickname: item.nickname || null,
-        code: item.code || null,
-        brand: item.brand || null,
-        measurements: item.measurements || {},
-        supplier_prices: item.supplierPrices || {},
-        chosen_supplier: item.chosenSupplier || null,
-        chosen_supplier_type: item.chosenSupplierType || null,
-        markup_percent: item.markupPercent ?? null,
-        sale_price: item.salePrice ?? 0,
-        needs_approval: item.needsApproval ?? false,
-        approval_status: item.approvalStatus || 'pending',
-      }));
+      const itemsToInsert = protocol.items.map((item) => {
+        // Only generate a new UUID if it's a temporary client-side ID (starts with 'item-')
+        const isTempItemId = String(item.id).startsWith('item-');
+        return {
+          protocol_id: actualId,
+          id: isTempItemId ? crypto.randomUUID() : item.id,
+          name: item.name,
+          quantity: item.quantity,
+          unit_price: item.unitPrice ?? 0,
+          cost_price: item.costPrice ?? 0,
+          type: item.type ?? 'estoque',
+          status: item.status ?? 'pendente',
+          oem: item.oem || null,
+          nickname: item.nickname || null,
+          code: item.code || null,
+          brand: item.brand || null,
+          measurements: item.measurements || {},
+          supplier_prices: item.supplierPrices || {},
+          chosen_supplier: item.chosenSupplier || null,
+          chosen_supplier_type: item.chosenSupplierType || null,
+          markup_percent: item.markupPercent ?? null,
+          sale_price: item.salePrice ?? 0,
+          needs_approval: item.needsApproval ?? false,
+          approval_status: item.approvalStatus || 'pending',
+        };
+      });
 
       console.log('[saveProtocol] Inserting', itemsToInsert.length, 'items for protocol', actualId);
 
