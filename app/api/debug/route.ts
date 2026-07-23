@@ -1,16 +1,7 @@
 import { NextResponse } from 'next/server';
-import { approveWithCustomMarkupAction, getPendingApprovalsAction } from '@/app/lib/actions/protocols';
+import { getSuppliersAction } from '@/app/lib/actions/suppliers';
 
 export async function GET(request: Request) {
-  const { searchParams } = new URL(request.url);
-  const itemId = searchParams.get('itemId');
-  const customMarkup = searchParams.get('customMarkup');
-  
-  if (!itemId || !customMarkup) {
-    const pendings = await getPendingApprovalsAction();
-    return NextResponse.json({ pendings });
-  }
-  
-  const result = await approveWithCustomMarkupAction(itemId, Number(customMarkup), 10);
+  const result = await getSuppliersAction();
   return NextResponse.json(result);
 }

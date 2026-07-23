@@ -51,111 +51,134 @@ export function TabelaCotacao({
           {items.length} {items.length === 1 ? 'item' : 'itens'}
         </span>
       </div>
-      <div className="overflow-x-auto">
-        <fieldset disabled={isViewing}>
-          <table className="w-full text-left border-collapse text-xs whitespace-nowrap">
-            <thead className="bg-slate-50/80 border-b border-slate-200">
-              <tr>
-                <th className="px-3 py-2.5 font-bold uppercase tracking-wider text-slate-500 text-[10px]">#</th>
-                <th className="px-3 py-2.5 font-bold uppercase tracking-wider text-slate-500 text-[10px]">Nome</th>
-                <th className="px-3 py-2.5 font-bold uppercase tracking-wider text-slate-500 text-[10px]">Código</th>
-                <th className="px-3 py-2.5 font-bold uppercase tracking-wider text-slate-500 text-[10px]">D.Int</th>
-                <th className="px-3 py-2.5 font-bold uppercase tracking-wider text-slate-500 text-[10px]">D.Ext</th>
-                <th className="px-3 py-2.5 font-bold uppercase tracking-wider text-slate-500 text-[10px]">A1</th>
-                <th className="px-3 py-2.5 font-bold uppercase tracking-wider text-slate-500 text-[10px]">A2</th>
-                <th className="px-3 py-2.5 font-bold uppercase tracking-wider text-slate-500 text-[10px]">Esp.</th>
-                <th className="px-3 py-2.5 font-bold uppercase tracking-wider text-slate-500 text-[10px]">C.S.</th>
-                <th className="px-3 py-2.5 font-bold uppercase tracking-wider text-slate-500 text-[10px] text-center">Qtd</th>
-                {suppliers.map((s) => (
-                  <th key={s.id} className="px-3 py-2.5 font-bold uppercase tracking-wider text-slate-500 text-[10px] text-center">
-                    <div className="flex flex-col items-center">
-                      <span>{s.name}</span>
-                      <span className="text-[8px] opacity-70 font-medium">
-                        {s.type === 'Fornecedor Original' ? '(Orig)' : '(Loc)'}
-                      </span>
-                    </div>
-                  </th>
-                ))}
-                <th className="px-3 py-2.5 font-bold uppercase tracking-wider text-slate-500 text-[10px] text-center bg-emerald-50/50">Vencedor</th>
-                <th className="px-3 py-2.5 font-bold uppercase tracking-wider text-slate-500 text-[10px] text-center bg-emerald-50/50">Markup %</th>
-                <th className="px-3 py-2.5 font-bold uppercase tracking-wider text-slate-500 text-[10px] text-right bg-emerald-50/50">Preço Un.</th>
-                <th className="px-3 py-2.5 font-bold uppercase tracking-wider text-slate-500 text-[10px] text-right bg-emerald-50/50">Total Venda</th>
-                {!isViewing && <th className="px-3 py-2.5 font-bold uppercase tracking-wider text-slate-500 text-[10px] text-center">Ações</th>}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-slate-100 bg-white">
-              {items.map((item, index) => {
-                const freeStock = getFreeStock(item.code || item.oem || item.name);
-                const canReallocate = freeStock > 0;
-                const isApproved = item.approvalStatus === 'approved';
-                const isUnlocked = unlockedItems.has(item.id);
-                const disableMarkup = (isApproved && !isUnlocked) || isViewing;
+      
+      <div className="p-4 space-y-4">
+        <fieldset disabled={isViewing} className="space-y-4">
+          {items.map((item, index) => {
+            const freeStock = getFreeStock(item.code || item.oem || item.name);
+            const canReallocate = freeStock > 0;
+            const isApproved = item.approvalStatus === 'approved';
+            const isUnlocked = unlockedItems.has(item.id);
+            const disableMarkup = (isApproved && !isUnlocked) || isViewing;
 
-                return (
-                  <tr key={item.id} className="hover:bg-slate-50 transition-colors group">
-                    <td className="px-3 py-2 text-slate-400 font-medium">{index + 1 + estoqueItemsCount}</td>
-                    <td className="px-3 py-2">
-                      <div className="flex flex-col">
-                        <span className="font-bold text-slate-800">{item.name}</span>
-                        {(item.brand || item.oem) && (
-                          <div className="flex items-center gap-1.5 mt-0.5">
-                            {item.brand && <span className="text-[10px] text-slate-500 bg-slate-100 px-1 rounded font-semibold">Marca: {item.brand}</span>}
-                            {item.oem && <span className="text-[10px] text-slate-500 bg-slate-100 px-1 rounded font-semibold">OEM: {item.oem}</span>}
-                          </div>
-                        )}
+            return (
+              <div key={item.id} className="flex flex-col rounded-xl border border-slate-200 bg-white overflow-hidden shadow-sm transition-shadow hover:shadow-md">
+                
+                {/* 1. CABEÇALHO DO ITEM */}
+                <div className="flex flex-col md:flex-row md:items-center justify-between p-4 bg-slate-50 border-b border-slate-200 gap-4">
+                  
+                  {/* Left: Identificação */}
+                  <div className="flex items-start gap-3">
+                    <span className="text-slate-400 font-bold text-sm">#{index + 1 + estoqueItemsCount}</span>
+                    <div>
+                      <div className="font-bold text-slate-800 text-sm leading-tight flex flex-wrap items-center gap-2">
+                        {item.name}
+                        {item.brand && <span className="px-1.5 py-0.5 rounded bg-slate-200/70 text-slate-600 text-[10px]">Marca: {item.brand}</span>}
+                        {item.oem && <span className="px-1.5 py-0.5 rounded bg-slate-200/70 text-slate-600 text-[10px]">OEM: {item.oem}</span>}
                       </div>
-                    </td>
-                    <td className="px-3 py-2 text-slate-600 font-medium">{item.code || '-'}</td>
-                    <td className="px-3 py-2 text-slate-600">{formatMeasurement(item.measurements.dInt)}</td>
-                    <td className="px-3 py-2 text-slate-600">{formatMeasurement(item.measurements.dExt)}</td>
-                    <td className="px-3 py-2 text-slate-600">{formatMeasurement(item.measurements.a1)}</td>
-                    <td className="px-3 py-2 text-slate-600">{formatMeasurement(item.measurements.a2)}</td>
-                    <td className="px-3 py-2 text-slate-600">{formatMeasurement(item.measurements.esp)}</td>
-                    <td className="px-3 py-2 text-slate-600">{formatMeasurement(item.measurements.cs)}</td>
-                    <td className="px-3 py-2">
+                      {item.code && <div className="text-xs text-slate-500 mt-0.5 font-medium">Cód: {item.code}</div>}
+                    </div>
+                  </div>
+
+                  {/* Middle: Medidas */}
+                  <div className="flex flex-wrap items-center gap-2 md:justify-center">
+                    {item.measurements.dInt && <span className="px-2 py-1 bg-white border border-slate-200 rounded text-[10px] font-semibold text-slate-600">D. Interno: {formatMeasurement(item.measurements.dInt)}</span>}
+                    {item.measurements.dExt && <span className="px-2 py-1 bg-white border border-slate-200 rounded text-[10px] font-semibold text-slate-600">D. Externo: {formatMeasurement(item.measurements.dExt)}</span>}
+                    {item.measurements.a1 && <span className="px-2 py-1 bg-white border border-slate-200 rounded text-[10px] font-semibold text-slate-600">A1: {formatMeasurement(item.measurements.a1)}</span>}
+                    {item.measurements.a2 && <span className="px-2 py-1 bg-white border border-slate-200 rounded text-[10px] font-semibold text-slate-600">A2: {formatMeasurement(item.measurements.a2)}</span>}
+                    {item.measurements.esp && <span className="px-2 py-1 bg-white border border-slate-200 rounded text-[10px] font-semibold text-slate-600">Espessura: {formatMeasurement(item.measurements.esp)}</span>}
+                    {item.measurements.cs && <span className="px-2 py-1 bg-white border border-slate-200 rounded text-[10px] font-semibold text-slate-600">C.S: {formatMeasurement(item.measurements.cs)}</span>}
+                  </div>
+
+                  {/* Right: Quantidade e Ações */}
+                  <div className="flex items-center justify-between md:justify-end gap-4 min-w-[120px]">
+                    <div className="flex items-center gap-2">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">QTD</label>
                       <input
                         type="number"
                         min="1"
                         value={item.quantity}
                         onChange={(e) => updateQuantity(item.id, Number(e.target.value))}
-                        className="w-16 rounded border border-slate-300 py-1 px-1.5 text-xs text-center text-slate-900 focus:border-emerald-500 focus:ring-emerald-500"
+                        className="w-16 rounded border border-slate-300 py-1 px-2 text-sm text-center text-slate-900 focus:border-emerald-500 focus:ring-emerald-500"
                       />
-                    </td>
+                    </div>
+                    {!isViewing && (
+                      <button
+                        type="button"
+                        onClick={() => removeItem(item.id)}
+                        className="text-rose-400 hover:text-rose-600 transition-colors p-1"
+                        title="Remover Item"
+                      >
+                        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* 2. ÁREA DE COTAÇÕES */}
+                <div className="p-4 bg-white">
+                  <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-3">Custos por Fornecedor (R$)</h4>
+                  <div className="flex flex-wrap gap-4">
                     {suppliers.map(sup => (
-                      <td key={sup.id} className="px-3 py-2">
+                      <div key={sup.id} className="flex flex-col w-28 shrink-0">
+                        <label className="text-[11px] font-semibold text-slate-700 truncate" title={sup.name}>
+                          {sup.name}
+                        </label>
+                        <span className="text-[9px] text-slate-400 mb-1">{sup.type === 'Fornecedor Original' ? '(F. Orig)' : '(M. Loc)'}</span>
                         <input
                           type="number"
-                          placeholder="0,00"
+                          placeholder="R$ 0,00"
                           value={item.supplierPrices?.[sup.id] || ''}
                           onChange={(e) => updateSupplierPrice(item.id, sup.id, e.target.value)}
-                          className={`w-20 rounded border py-1 px-1.5 text-xs text-center text-slate-900 transition-colors focus:ring-1 focus:outline-none ${
+                          className={`w-full rounded border py-1.5 px-2 text-sm text-center text-slate-900 transition-colors focus:ring-1 focus:outline-none ${
                             item.chosenSupplier === sup.id 
-                              ? 'border-emerald-500 bg-emerald-50/50 ring-emerald-500 font-bold' 
+                              ? 'border-emerald-500 bg-emerald-50/30 text-emerald-900 ring-emerald-500 font-bold' 
                               : 'border-slate-200 focus:border-emerald-500 focus:ring-emerald-500'
                           }`}
                         />
-                      </td>
+                      </div>
                     ))}
-                    <td className="px-3 py-2 text-center bg-emerald-50/30">
-                      {item.chosenSupplier ? (
-                        <div className="flex flex-col items-center">
-                          <span className="inline-flex items-center gap-1 rounded bg-emerald-100 px-1.5 py-0.5 text-[10px] font-bold text-emerald-700">
-                            <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                            {suppliers.find(s => s.id === item.chosenSupplier)?.name || item.chosenSupplier}
-                          </span>
-                        </div>
-                      ) : (
-                        <span className="text-[10px] text-slate-400 italic font-medium">Nenhum</span>
-                      )}
-                    </td>
-                    <td className="px-3 py-2 bg-emerald-50/30 text-center">
-                      <div className="relative inline-block">
+                  </div>
+                </div>
+
+                {/* 3. RESULTADOS E MARGINS */}
+                <div className="bg-slate-50 border-t border-slate-200 p-3 flex flex-col md:flex-row items-center justify-between gap-4">
+                  
+                  {/* Left: Vencedor e Alertas */}
+                  <div className="flex items-center gap-3">
+                    {item.chosenSupplier ? (
+                      <div className="flex items-center gap-1.5 px-2.5 py-1 bg-emerald-100 text-emerald-800 rounded-lg text-xs font-bold border border-emerald-200">
+                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                        {suppliers.find(s => s.id === item.chosenSupplier)?.name || item.chosenSupplier}
+                      </div>
+                    ) : (
+                      <div className="text-[11px] text-slate-400 font-medium italic">Nenhum custo informado</div>
+                    )}
+
+                    {canReallocate && (
+                      <button
+                        type="button"
+                        onClick={() => handleReallocate(item.id, freeStock)}
+                        className="text-[10px] font-bold text-amber-600 bg-amber-50 hover:bg-amber-100 px-2 py-1 rounded border border-amber-200 transition-colors"
+                      >
+                        Aproveitar {freeStock} un. Estoque
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Right: Financeiro */}
+                  <div className="flex items-center gap-6">
+                    <div className="flex items-center gap-2">
+                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Markup %</label>
+                      <div className="relative group">
                         <input
                           type="number"
                           value={item.markupPercent ?? ''}
                           onChange={(e) => updateItemMarkup(item.id, e.target.value)}
                           disabled={disableMarkup}
-                          className={`w-14 rounded border py-1 px-1.5 text-xs text-center font-bold text-slate-900 ${
+                          className={`w-16 rounded border py-1.5 px-2 text-sm text-center font-bold text-slate-900 ${
                             item.needsApproval
                               ? isApproved
                                 ? 'border-emerald-300 bg-emerald-50 text-emerald-800 focus:ring-emerald-500 cursor-not-allowed'
@@ -167,51 +190,31 @@ export function TabelaCotacao({
                           <button
                             type="button"
                             onClick={() => handleUnlock(item.id)}
-                            className="absolute -right-1.5 -top-1.5 bg-emerald-500 text-white rounded-full p-0.5 hover:bg-emerald-600 transition-colors shadow-sm z-10 cursor-pointer"
-                            title="Desbloquear Markup"
+                            className="absolute -right-2 -top-2 bg-emerald-500 text-white rounded-full p-0.5 hover:bg-emerald-600 transition-colors shadow-sm z-10 cursor-pointer"
+                            title="Desbloquear Markup (Markup foi aprovado pelo Admin)"
                           >
-                            <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
                           </button>
                         )}
                       </div>
-                    </td>
-                    <td className="px-3 py-2 text-right font-semibold text-slate-700 bg-emerald-50/30">
-                      {formatCurrency(item.salePrice || 0)}
-                    </td>
-                    <td className="px-3 py-2 text-right font-black text-slate-900 bg-emerald-50/30">
-                      {formatCurrency((item.salePrice || 0) * item.quantity)}
-                    </td>
-                    {!isViewing && (
-                      <td className="px-3 py-2 text-center">
-                        <div className="flex flex-col items-center gap-1.5">
-                          <button
-                            type="button"
-                            onClick={() => removeItem(item.id)}
-                            className="text-rose-400 hover:text-rose-600 transition-colors p-1"
-                            title="Remover Item"
-                          >
-                            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                            </svg>
-                          </button>
-                          {canReallocate && (
-                            <button
-                              type="button"
-                              onClick={() => handleReallocate(item.id, freeStock)}
-                              className="text-[9px] font-bold text-amber-600 bg-amber-50 hover:bg-amber-100 px-1.5 py-0.5 rounded border border-amber-200 transition-colors"
-                              title={`Temos ${freeStock} un. no estoque que podem ser usadas!`}
-                            >
-                              Aproveitar {freeStock} un. Estoque
-                            </button>
-                          )}
-                        </div>
-                      </td>
-                    )}
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
+                    </div>
+
+                    <div className="flex items-center gap-6">
+                      <div>
+                        <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-0.5 text-right">Preço Un.</div>
+                        <div className="text-sm font-semibold text-slate-600">{formatCurrency(item.salePrice || 0)}</div>
+                      </div>
+                      <div>
+                        <div className="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-0.5 text-right">Total Venda</div>
+                        <div className="text-sm font-black text-slate-900">{formatCurrency((item.salePrice || 0) * item.quantity)}</div>
+                      </div>
+                    </div>
+                  </div>
+
+                </div>
+              </div>
+            );
+          })}
         </fieldset>
       </div>
     </div>
