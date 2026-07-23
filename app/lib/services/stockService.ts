@@ -1,14 +1,37 @@
-import { stockMockProducts } from '../mocks/stockMockData';
+import { createClient } from '../supabase/client';
 import type { StockProduct } from '../types/database';
 
 /**
- * Simulates an API call to Bling to fetch the full stock catalog.
- * In production, replace with actual API fetch.
+ * Fetches the full stock catalog from Supabase stock_products table.
  */
 export async function fetchStock(): Promise<StockProduct[]> {
-  // Simulate network latency
-  await new Promise((resolve) => setTimeout(resolve, 350));
-  return stockMockProducts;
+  try {
+    const supabase = createClient();
+    const { data, error } = await supabase
+      .from('stock_products')
+      .select('*');
+
+    if (error) {
+      console.error('Error fetching stock from Supabase:', error);
+      return [];
+    }
+
+    // Map the database columns (snake_case) to application model (camelCase)
+    return (data || []).map((row: any) => ({
+      id: row.id,
+      name: row.name,
+      sku: row.sku,
+      code: row.code,
+      stock: Number(row.stock),
+      costPrice: Number(row.cost_price),
+      category: row.category,
+      brand: row.brand || undefined,
+      measurements: row.measurements || {}
+    }));
+  } catch (err) {
+    console.error('Exception in fetchStock:', err);
+    return [];
+  }
 }
 
 /**
@@ -28,6 +51,8 @@ export function searchStock(products: StockProduct[], query: string): StockProdu
     if (p.sku.toLowerCase().includes(q)) return true;
     // Match by category
     if (p.category.toLowerCase().includes(q)) return true;
+    // Match by brand
+    if (p.brand && p.brand.toLowerCase().includes(q)) return true;
 
     // Match by measurement values (user types a number like "50" or "120")
     if (p.measurements) {
@@ -52,6 +77,7 @@ export function filterStockByForm(
     name: string;
     oem: string;
     code: string;
+    brand?: string;
     measurements: Record<string, string>;
   }
 ): StockProduct[] {
@@ -65,6 +91,7 @@ export function filterStockByForm(
   const name = form.name.trim().toLowerCase();
   const oem = form.oem.trim().toLowerCase();
   const code = form.code.trim().toLowerCase();
+  const brand = (form.brand || '').trim().toLowerCase();
 
   const mInner = parseFloat(form.measurements.innerDiameter);
   const mOuter = parseFloat(form.measurements.outerDiameter);
@@ -77,6 +104,7 @@ export function filterStockByForm(
     name.length >= 2 ||
     oem.length >= 2 ||
     code.length >= 2 ||
+    brand.length >= 2 ||
     !isNaN(mInner) ||
     !isNaN(mOuter) ||
     !isNaN(mH1) ||
@@ -99,6 +127,11 @@ export function filterStockByForm(
 
     // Check Code
     if (code.length >= 2 && !p.code.toLowerCase().includes(code) && !p.sku.toLowerCase().includes(code)) {
+      return false;
+    }
+
+    // Check Brand
+    if (brand.length >= 2 && p.brand && !p.brand.toLowerCase().includes(brand)) {
       return false;
     }
 
@@ -142,15 +175,17 @@ export function findStockMatch(
     height2?: number;
     thickness?: number;
     cs?: number;
-  }
+  },
+  itemBrand?: string
 ): StockProduct | null {
   const nameLower = itemName.trim().toLowerCase();
   if (!nameLower) return null;
 
-  // First try exact name + measurement match
+  // First try exact name + brand + measurement match
   if (itemMeasurements) {
     const exactMatch = products.find((p) => {
       if (!p.name.toLowerCase().includes(nameLower)) return false;
+      if (itemBrand && p.brand && !p.brand.toLowerCase().includes(itemBrand.trim().toLowerCase())) return false;
       if (!p.measurements) return false;
 
       const m = p.measurements;

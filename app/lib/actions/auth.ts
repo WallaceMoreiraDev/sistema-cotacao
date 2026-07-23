@@ -19,7 +19,9 @@ export async function login(formData: FormData) {
   });
 
   if (error) {
-    return { error: 'Credenciais inválidas. Verifique seu e-mail e senha.' };
+    console.error("Login error details:", error);
+    // Return the actual error message for debugging purposes
+    return { error: `Erro no login: ${error.message} (Code: ${error.status})` };
   }
 
   redirect('/dashboard');

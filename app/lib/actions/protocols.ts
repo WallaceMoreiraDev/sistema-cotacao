@@ -1,7 +1,8 @@
 'use server';
 
 import { createClient } from '../supabase/server';
-import type { Protocol, ProtocolItem } from '../types/database';
+import { revalidatePath } from 'next/cache';
+import type { Protocol, ProtocolItem, StockHolder } from '../types/database';
 
 /**
  * Maps database row (snake_case) to application ProtocolItem (camelCase)
@@ -18,6 +19,7 @@ function mapRowToProtocolItem(row: any): ProtocolItem {
     oem: row.oem || undefined,
     nickname: row.nickname || undefined,
     code: row.code || undefined,
+    brand: row.brand || undefined,
     measurements: row.measurements || {},
     supplierPrices: row.supplier_prices || {},
     chosenSupplier: row.chosen_supplier || undefined,
@@ -25,6 +27,7 @@ function mapRowToProtocolItem(row: any): ProtocolItem {
     markupPercent: row.markup_percent !== null && row.markup_percent !== undefined ? Number(row.markup_percent) : undefined,
     salePrice: Number(row.sale_price ?? 0),
     needsApproval: Boolean(row.needs_approval),
+    approvalStatus: row.approval_status || 'pending',
   };
 }
 
@@ -45,7 +48,7 @@ function mapRowsToProtocol(protoRow: any, itemRows: any[] = []): Protocol {
     clientName: protoRow.client_name,
     clientCnpj: protoRow.client_cnpj || undefined,
     title: protoRow.title || undefined,
-    status: protoRow.status || 'draft',
+    status: protoRow.status || 'nao_reservado',
     createdAt: protoRow.created_at || new Date().toISOString(),
     updatedAt: protoRow.updated_at || new Date().toISOString(),
     draftForm: protoRow.draft_form || undefined,
@@ -154,7 +157,7 @@ export async function saveProtocolAction(protocol: Protocol): Promise<{ success:
       client_name: protocol.clientName,
       client_cnpj: protocol.clientCnpj || null,
       title: protocol.title || null,
-      status: protocol.status || 'draft',
+      status: protocol.status || 'nao_reservado',
       total_venda: totalVenda,
       draft_form: protocol.draftForm || null,
       updated_at: new Date().toISOString(),
@@ -165,6 +168,40 @@ export async function saveProtocolAction(protocol: Protocol): Promise<{ success:
     }
 
     console.log('[saveProtocol] Upserting protocol:', { isTempId, id: protocol.id, status: protocol.status, itemCount: protocol.items?.length ?? 0 });
+
+    // 0. STOCK VALIDATION (Prevent race conditions when "Efetivando")
+    if (protocol.status !== 'nao_reservado' && protocol.status !== 'cancelado' && protocol.items && protocol.items.length > 0) {
+      const estoqueItems = protocol.items.filter(i => i.type === 'estoque');
+      if (estoqueItems.length > 0) {
+        // Fetch reservations excluding this protocol
+        const reservations = await getReservedStockAction(isTempId ? undefined : Number(protocol.id));
+        
+        // Fetch current stock from DB for the items
+        const identifiers = estoqueItems.map(i => i.code || i.oem || i.name).filter(Boolean);
+        const { data: stockData } = await supabase
+          .from('stock_products')
+          .select('sku, code, name, stock')
+          .or(`code.in.(${identifiers.map(i => `"${i}"`).join(',')}),sku.in.(${identifiers.map(i => `"${i}"`).join(',')}),name.in.(${identifiers.map(i => `"${i}"`).join(',')})`);
+          
+        if (stockData) {
+          for (const item of estoqueItems) {
+            const identifier = item.code || item.oem || item.name;
+            if (!identifier) continue;
+            
+            const product = stockData.find(p => p.code === identifier || p.sku === identifier || p.name === identifier);
+            if (product) {
+              const maxStock = Number(product.stock) || 0;
+              const reserved = reservations[identifier]?.total || 0;
+              const freeStock = maxStock - reserved;
+              
+              if (item.quantity > freeStock) {
+                return { success: false, error: `Estoque insuficiente para o item ${item.name}. Disponível: ${freeStock}, Solicitado: ${item.quantity}. Recarregue a página para ver os estoques atualizados.` };
+              }
+            }
+          }
+        }
+      }
+    }
 
     // 1. Upsert Protocol
     const { data: protoRow, error: protoError } = await supabase
@@ -203,6 +240,7 @@ export async function saveProtocolAction(protocol: Protocol): Promise<{ success:
         oem: item.oem || null,
         nickname: item.nickname || null,
         code: item.code || null,
+        brand: item.brand || null,
         measurements: item.measurements || {},
         supplier_prices: item.supplierPrices || {},
         chosen_supplier: item.chosenSupplier || null,
@@ -210,6 +248,7 @@ export async function saveProtocolAction(protocol: Protocol): Promise<{ success:
         markup_percent: item.markupPercent ?? null,
         sale_price: item.salePrice ?? 0,
         needs_approval: item.needsApproval ?? false,
+        approval_status: item.approvalStatus || 'pending',
       }));
 
       console.log('[saveProtocol] Inserting', itemsToInsert.length, 'items for protocol', actualId);
@@ -226,8 +265,176 @@ export async function saveProtocolAction(protocol: Protocol): Promise<{ success:
 
     return { success: true, data: updatedProtocol };
   } catch (err: any) {
-    console.error('Exception in saveProtocolAction:', err);
-    return { success: false, error: err?.message || 'Falha ao salvar protocolo no Supabase' };
+    console.error('[saveProtocol] Exception:', err);
+    return { success: false, error: err?.message || 'Erro inesperado ao salvar protocolo' };
+  }
+}
+
+/**
+ * Reservar Estoque Action
+ * Changes protocol status to 'reservado' and all unreserved stock items to 'reservado'
+ */
+export async function reservarEstoqueAction(protocolId: string | number): Promise<{ success: boolean; error?: string }> {
+  try {
+    const supabase = await createClient();
+
+    // 1. Validate Stock before reserving
+    const { data: items } = await supabase
+      .from('protocol_items')
+      .select('*')
+      .eq('protocol_id', Number(protocolId))
+      .eq('type', 'estoque');
+
+    if (items && items.length > 0) {
+      const reservations = await getReservedStockAction(Number(protocolId));
+      const identifiers = items.map(i => i.code || i.oem || i.name).filter(Boolean);
+      
+      if (identifiers.length > 0) {
+        const { data: stockData } = await supabase
+          .from('stock_products')
+          .select('sku, code, name, stock')
+          .or(`code.in.(${identifiers.map(i => `"${i}"`).join(',')}),sku.in.(${identifiers.map(i => `"${i}"`).join(',')}),name.in.(${identifiers.map(i => `"${i}"`).join(',')})`);
+          
+        if (stockData) {
+          for (const item of items) {
+            const identifier = item.code || item.oem || item.name;
+            if (!identifier) continue;
+            
+            const product = stockData.find(p => p.code === identifier || p.sku === identifier || p.name === identifier);
+            if (product) {
+              const maxStock = Number(product.stock) || 0;
+              const reserved = reservations[identifier]?.total || 0;
+              const freeStock = maxStock - reserved;
+              
+              if (Number(item.quantity) > freeStock) {
+                return { success: false, error: `Estoque insuficiente para o item ${item.name}. Disponível: ${freeStock}, Solicitado: ${item.quantity}. Recarregue a página.` };
+              }
+            }
+          }
+        }
+      }
+    }
+    
+    // Update protocol status
+    const { error: protoError } = await supabase
+      .from('protocols')
+      .update({ status: 'reservado', updated_at: new Date().toISOString() })
+      .eq('id', Number(protocolId));
+      
+    if (protoError) throw protoError;
+
+    // Update stock items to 'reservado'
+    const { error: itemsError } = await supabase
+      .from('protocol_items')
+      .update({ status: 'reservado' })
+      .eq('protocol_id', Number(protocolId))
+      .eq('type', 'estoque');
+
+    if (itemsError) throw itemsError;
+
+    return { success: true };
+  } catch (err: any) {
+    console.error('[reservarEstoque] Exception:', err);
+    return { success: false, error: err?.message || 'Falha ao reservar estoque.' };
+  }
+}
+
+/**
+ * Enviar para Bling Action
+ * Completes the protocol (status 'finalizado'). Note: validation of items must be done on the client or before this call.
+ */
+export async function enviarParaBlingAction(protocolId: string | number): Promise<{ success: boolean; error?: string }> {
+  try {
+    const supabase = await createClient();
+    
+    const { error: protoError } = await supabase
+      .from('protocols')
+      .update({ status: 'finalizado', updated_at: new Date().toISOString() })
+      .eq('id', Number(protocolId));
+      
+    if (protoError) throw protoError;
+    
+    // We could add integration logic to Bling here later
+
+    return { success: true };
+  } catch (err: any) {
+    console.error('[enviarParaBling] Exception:', err);
+    return { success: false, error: err?.message || 'Falha ao enviar para o Bling.' };
+  }
+}
+
+/**
+ * Cancelar Cotação Action
+ * Changes protocol status to 'cancelado' and un-reserves stock items
+ */
+export async function cancelarCotacaoAction(protocolId: string | number): Promise<{ success: boolean; error?: string }> {
+  try {
+    const supabase = await createClient();
+    
+    const { error: protoError } = await supabase
+      .from('protocols')
+      .update({ status: 'cancelado', updated_at: new Date().toISOString() })
+      .eq('id', Number(protocolId));
+      
+    if (protoError) throw protoError;
+
+    // Un-reserve items so they go back to the pool
+    const { error: itemsError } = await supabase
+      .from('protocol_items')
+      .update({ status: 'pendente' })
+      .eq('protocol_id', Number(protocolId))
+      .eq('status', 'reservado');
+      
+    if (itemsError) console.error('Failed to un-reserve items during cancellation:', itemsError);
+
+    return { success: true };
+  } catch (err: any) {
+    console.error('[cancelarCotacao] Exception:', err);
+    return { success: false, error: err?.message || 'Falha ao cancelar cotação.' };
+  }
+}
+
+/**
+ * Estornar Cotação Action
+ * Changes a finished protocol back to 'reservado' (items keep their status)
+ */
+export async function estornarCotacaoAction(protocolId: string | number): Promise<{ success: boolean; error?: string }> {
+  try {
+    const supabase = await createClient();
+    
+    const { error: protoError } = await supabase
+      .from('protocols')
+      .update({ status: 'reservado', updated_at: new Date().toISOString() })
+      .eq('id', Number(protocolId));
+      
+    if (protoError) throw protoError;
+
+    return { success: true };
+  } catch (err: any) {
+    console.error('[estornarCotacao] Exception:', err);
+    return { success: false, error: err?.message || 'Falha ao estornar cotação.' };
+  }
+}
+
+/**
+ * Restaurar Cotação Action
+ * Changes a cancelled protocol back to 'nao_reservado'
+ */
+export async function restaurarCotacaoAction(protocolId: string | number): Promise<{ success: boolean; error?: string }> {
+  try {
+    const supabase = await createClient();
+    
+    const { error: protoError } = await supabase
+      .from('protocols')
+      .update({ status: 'nao_reservado', updated_at: new Date().toISOString() })
+      .eq('id', Number(protocolId));
+      
+    if (protoError) throw protoError;
+    
+    return { success: true };
+  } catch (err: any) {
+    console.error('[restaurarCotacao] Exception:', err);
+    return { success: false, error: err?.message || 'Falha ao restaurar cotação.' };
   }
 }
 
@@ -283,12 +490,12 @@ export async function deleteProtocolAction(id: string): Promise<{ success: boole
  * Gets a map of product code -> total reserved quantity across active protocols.
  * Active protocols are those that are not 'draft' (Rascunho) and not 'approved' (Finalizado).
  */
-export async function getReservedStockAction(excludeProtocolId?: number): Promise<Record<string, number>> {
+export async function getReservedStockAction(excludeProtocolId?: number): Promise<Record<string, { total: number; heldBy: StockHolder[] }>> {
   try {
     const supabase = await createClient();
 
     // Active statuses that hold stock reservation
-    const activeStatuses = ['in_progress', 'separating', 'in_review', 'rejected'];
+    const activeStatuses = ['reservado', 'finalizado'];
 
     // 1. Get IDs of active protocols
     const { data: activeProtocols, error: protoError } = await supabase
@@ -302,10 +509,10 @@ export async function getReservedStockAction(excludeProtocolId?: number): Promis
 
     const protocolIds = activeProtocols.map(p => p.id);
 
-    // 2. Get items of these protocols
+    // 2. Get items of these protocols WITH protocol details
     let query = supabase
       .from('protocol_items')
-      .select('code, oem, name, quantity, type')
+      .select('code, oem, name, quantity, type, protocol_id, protocols ( id, client_name, title )')
       .in('protocol_id', protocolIds)
       .eq('type', 'estoque'); // only care about stock items
 
@@ -319,14 +526,29 @@ export async function getReservedStockAction(excludeProtocolId?: number): Promis
       return {};
     }
 
-    // 3. Sum up quantities
+    // 3. Sum up quantities and map holders
     // For stock mapping, we prefer 'code'. If not present, we fallback to 'oem' or 'name'.
-    const reservations: Record<string, number> = {};
+    const reservations: Record<string, { total: number; heldBy: StockHolder[] }> = {};
     for (const item of items) {
       const identifier = item.code || item.oem || item.name;
       if (!identifier) continue;
       
-      reservations[identifier] = (reservations[identifier] || 0) + (Number(item.quantity) || 0);
+      const qty = Number(item.quantity) || 0;
+      
+      if (!reservations[identifier]) {
+        reservations[identifier] = { total: 0, heldBy: [] };
+      }
+      
+      reservations[identifier].total += qty;
+      
+      const p = Array.isArray(item.protocols) ? item.protocols[0] : item.protocols;
+      
+      reservations[identifier].heldBy.push({
+        protocolId: p?.id || item.protocol_id,
+        clientName: p?.client_name || 'Desconhecido',
+        title: p?.title || '',
+        quantity: qty
+      });
     }
 
     return reservations;
@@ -335,4 +557,99 @@ export async function getReservedStockAction(excludeProtocolId?: number): Promis
     console.error('Error fetching reserved stock:', err);
     return {};
   }
+}
+
+export async function getPendingApprovalsAction() {
+  const supabase = await createClient();
+  const { data, error } = await supabase
+    .from('protocol_items')
+    .select(`
+      *,
+      protocols!inner(id, client_name, title, status)
+    `)
+    .eq('needs_approval', true)
+    .eq('approval_status', 'pending')
+    .neq('protocols.status', 'cancelado')
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    console.error('Error fetching pending approvals:', error);
+    return { success: false, error: error.message };
+  }
+  
+  // Format the data a bit for the frontend
+  const formattedData = data.map((item: any) => ({
+    ...mapRowToProtocolItem(item),
+    protocol: Array.isArray(item.protocols) ? item.protocols[0] : item.protocols
+  }));
+
+  return { success: true, data: formattedData };
+}
+
+export async function approveItemAction(itemId: string) {
+  const supabase = await createClient();
+  const { error } = await supabase
+    .from('protocol_items')
+    .update({ approval_status: 'approved' })
+    .eq('id', itemId);
+
+  if (error) {
+    console.error('Error approving item:', error);
+    return { success: false, error: error.message };
+  }
+  
+  revalidatePath('/admin/aprovacoes');
+  revalidatePath('/protocolo/[id]', 'page');
+  return { success: true };
+}
+
+export async function approveWithCustomMarkupAction(itemId: string, customMarkup: number, basePrice: number) {
+  console.log('approveWithCustomMarkupAction called with:', { itemId, customMarkup, basePrice });
+  const supabase = await createClient();
+  const salePrice = basePrice * (1 + customMarkup / 100);
+  console.log('calculated salePrice:', salePrice);
+  
+  const { error } = await supabase
+    .from('protocol_items')
+    .update({ 
+      approval_status: 'approved',
+      markup_percent: customMarkup,
+      sale_price: salePrice,
+      needs_approval: true 
+    })
+    .eq('id', itemId);
+
+  if (error) {
+    console.error('Error approving item with custom markup:', error);
+    return { success: false, error: error.message };
+  }
+  console.log('update successful for item:', itemId);
+  
+  revalidatePath('/admin/aprovacoes');
+  revalidatePath('/protocolo/[id]', 'page');
+  return { success: true };
+}
+
+export async function rejectItemAction(itemId: string, defaultMarkup: number, basePrice: number) {
+  const supabase = await createClient();
+  const salePrice = basePrice * (1 + defaultMarkup / 100);
+  
+  const { error } = await supabase
+    .from('protocol_items')
+    .update({ 
+      approval_status: 'rejected',
+      needs_approval: false,
+      markup_percent: defaultMarkup,
+      sale_price: salePrice
+    })
+    .eq('id', itemId);
+
+  if (error) {
+    console.error('Error rejecting item:', error);
+    return { success: false, error: error.message };
+  }
+  
+  revalidatePath('/admin/aprovacoes');
+  revalidatePath('/protocolo/[id]', 'page');
+  return { success: true };
 }

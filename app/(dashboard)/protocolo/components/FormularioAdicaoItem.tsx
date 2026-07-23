@@ -19,6 +19,7 @@ interface FormularioAdicaoItemProps {
   allItemsCount: number;
   getFreeStock: (identifier: string, stockProducts: StockProduct[]) => number;
   isViewing?: boolean;
+  sealTypesLoading?: boolean;
 }
 
 export function FormularioAdicaoItem({
@@ -36,6 +37,7 @@ export function FormularioAdicaoItem({
   allItemsCount,
   getFreeStock,
   isViewing = false,
+  sealTypesLoading = false,
 }: FormularioAdicaoItemProps) {
   const [isSealDropdownOpen, setIsSealDropdownOpen] = useState(false);
   const [stockSearchQuery, setStockSearchQuery] = useState('');
@@ -48,6 +50,7 @@ export function FormularioAdicaoItem({
     updateItemField('name', product.name);
     updateItemField('code', product.code || '');
     updateItemField('oem', product.sku || '');
+    updateItemField('brand', product.brand || '');
     updateItemField('quantity', '1');
     if (product.measurements) {
       if (product.measurements.innerDiameter !== undefined) updateMeasurement('innerDiameter', String(product.measurements.innerDiameter));
@@ -101,7 +104,7 @@ export function FormularioAdicaoItem({
                 </span>
               </div>
 
-              <div className="grid grid-cols-2 gap-3 sm:grid-cols-5">
+              <div className="grid grid-cols-2 gap-4 sm:grid-cols-6">
                 <div className="col-span-2 sm:col-span-1 relative">
                   <label className="block text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-1 flex items-center justify-between">
                     <span>Nome / Tipo *</span>
@@ -109,24 +112,34 @@ export function FormularioAdicaoItem({
                       <span className="text-[9px] text-red-500 font-normal">Inválido</span>
                     )}
                   </label>
-                  <input
-                    type="text"
-                    value={itemForm.name}
-                    onFocus={() => setIsSealDropdownOpen(true)}
-                    onChange={(e) => {
-                      updateItemField('name', e.target.value);
-                      setIsSealDropdownOpen(true);
-                    }}
-                    onBlur={() => setTimeout(() => setIsSealDropdownOpen(false), 200)}
-                    placeholder="Selecione um tipo..."
-                    className={`w-full rounded-lg border px-3 py-2 text-xs text-slate-800 placeholder-slate-400 outline-none transition ${
-                      itemForm.name.trim() && !isValidSealType
-                        ? 'border-red-300 bg-red-50/50 focus:border-red-500'
-                        : 'border-slate-200 bg-slate-50 focus:border-slate-400 focus:bg-white'
-                    }`}
-                  />
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={itemForm.name}
+                      onFocus={() => setIsSealDropdownOpen(true)}
+                      onChange={(e) => {
+                        updateItemField('name', e.target.value);
+                        setIsSealDropdownOpen(true);
+                      }}
+                      onBlur={() => setTimeout(() => setIsSealDropdownOpen(false), 200)}
+                      placeholder="Selecione um tipo..."
+                      className={`w-full rounded-lg border px-3 py-2 text-xs text-slate-800 placeholder-slate-400 outline-none transition pr-8 ${
+                        itemForm.name.trim() && !isValidSealType
+                          ? 'border-red-300 bg-red-50/50 focus:border-red-500'
+                          : 'border-slate-200 bg-slate-50 focus:border-slate-400 focus:bg-white'
+                      }`}
+                    />
+                    {sealTypesLoading && (
+                      <div className="absolute right-2 top-1/2 -translate-y-1/2">
+                        <svg className="h-4 w-4 animate-spin text-slate-400" fill="none" viewBox="0 0 24 24">
+                          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                        </svg>
+                      </div>
+                    )}
+                  </div>
 
-                  {isSealDropdownOpen && filteredSealTypes.length > 0 && (
+                  {isSealDropdownOpen && !sealTypesLoading && filteredSealTypes.length > 0 && (
                     <div className="absolute left-0 right-0 top-full z-30 mt-1 max-h-44 overflow-y-auto rounded-xl border border-slate-200 bg-white p-1 shadow-xl">
                       <p className="px-2 py-1 text-[9px] font-bold uppercase tracking-wider text-slate-400">Vedações Cadastradas</p>
                       {filteredSealTypes.map((sealType) => (
@@ -140,7 +153,11 @@ export function FormularioAdicaoItem({
                           className="flex w-full items-center justify-between rounded-lg px-2.5 py-1.5 text-left text-xs font-medium text-slate-700 transition hover:bg-slate-100 hover:text-slate-900"
                         >
                           <span className="font-semibold">{sealType.name}</span>
-                          {sealType.category && <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[9px] text-slate-500">{sealType.category}</span>}
+                          {sealType.family?.name && (
+                            <span className="rounded bg-slate-100 px-1.5 py-0.5 text-[9px] text-slate-500 uppercase tracking-wide">
+                              {sealType.family.name}
+                            </span>
+                          )}
                         </button>
                       ))}
                     </div>
@@ -181,6 +198,16 @@ export function FormularioAdicaoItem({
                   />
                 </div>
                 <div>
+                  <label className="block text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-1">Marca</label>
+                  <input
+                    type="text"
+                    value={itemForm.brand}
+                    onChange={(e) => updateItemField('brand', e.target.value)}
+                    placeholder="Freudenberg"
+                    className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-800 placeholder-slate-400 outline-none transition focus:border-slate-400 focus:bg-white"
+                  />
+                </div>
+                <div>
                   <label className="block text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-1">Quantidade *</label>
                   <input
                     type="number"
@@ -196,23 +223,34 @@ export function FormularioAdicaoItem({
 
               <div>
                 <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-2">Medidas (mm) *</p>
-                <div className="grid grid-cols-3 gap-3 sm:grid-cols-6">
-                  {MEASUREMENT_FIELDS.map((field) => (
-                    <div key={field.key}>
-                      <label className="block text-[9px] font-medium text-slate-400 mb-0.5">{field.label}</label>
-                      <div className="relative">
-                        <input
-                          type="text"
-                          inputMode="decimal"
-                          value={itemForm.measurements[field.key]}
-                          onChange={(e) => updateMeasurement(field.key, e.target.value)}
-                          placeholder="0.00"
-                          className="w-full rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 pr-8 text-xs text-slate-800 placeholder-slate-400 outline-none transition focus:border-slate-400 focus:bg-white"
-                        />
-                        <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] text-slate-400">{field.suffix}</span>
+                <div className="flex flex-wrap gap-3">
+                  {(() => {
+                    const selectedSealType = filteredSealTypes.find(t => t.name.toLowerCase() === itemForm.name.trim().toLowerCase());
+                    const visibleFields = (selectedSealType && selectedSealType.requiredMeasurements && selectedSealType.requiredMeasurements.length > 0)
+                      ? MEASUREMENT_FIELDS.filter(f => selectedSealType.requiredMeasurements!.includes(f.key))
+                      : MEASUREMENT_FIELDS; // show all if invalid type or none configured
+
+                    if (visibleFields.length === 0) {
+                      return <p className="text-xs text-slate-400 italic">Nenhuma medida exigida para este tipo.</p>;
+                    }
+
+                    return visibleFields.map((field) => (
+                      <div key={field.key} className="w-24 flex-grow sm:flex-grow-0">
+                        <label className="block text-[9px] font-medium text-slate-400 mb-0.5">{field.label}</label>
+                        <div className="relative">
+                          <input
+                            type="text"
+                            inputMode="decimal"
+                            value={itemForm.measurements[field.key]}
+                            onChange={(e) => updateMeasurement(field.key, e.target.value)}
+                            placeholder="0.00"
+                            className="w-full rounded-lg border border-slate-200 bg-slate-50 px-2.5 py-1.5 pr-8 text-xs text-slate-800 placeholder-slate-400 outline-none transition focus:border-slate-400 focus:bg-white"
+                          />
+                          <span className="absolute right-2 top-1/2 -translate-y-1/2 text-[9px] text-slate-400">{field.suffix}</span>
+                        </div>
                       </div>
-                    </div>
-                  ))}
+                    ));
+                  })()}
                 </div>
               </div>
 
@@ -291,7 +329,10 @@ export function FormularioAdicaoItem({
                       <div className="flex items-start justify-between">
                         <div>
                           <p className="text-xs font-bold text-slate-800">{product.name}</p>
-                          <p className="text-[10px] text-slate-500 mt-0.5">{product.code} · {product.sku}</p>
+                          <p className="text-[10px] text-slate-500 mt-0.5">
+                            {product.code} · {product.sku}
+                            {product.brand && <span className="font-semibold text-amber-600"> · {product.brand}</span>}
+                          </p>
                         </div>
                         <div className="flex flex-col items-end gap-1">
                           <span className={`rounded-full px-2 py-0.5 text-[10px] font-bold ${

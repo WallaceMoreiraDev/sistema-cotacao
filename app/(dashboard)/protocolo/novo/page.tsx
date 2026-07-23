@@ -4,8 +4,8 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createProtocol, calculateTotals } from '../../../lib/services/protocolService';
-import { areItemsMatching } from '../../../lib/utils/protocolFormatters';
-import { saveProtocolAction } from '../../../lib/actions/protocols';
+import { areItemsMatching, countUniqueProtocolItems } from '../../../lib/utils/protocolFormatters';
+import { saveProtocolAction, cancelarCotacaoAction } from '../../../lib/actions/protocols';
 import { createClientAction } from '../../../lib/actions/clients';
 import type { ProtocolItem } from '../../../lib/types/database';
 
@@ -20,6 +20,7 @@ import { TabelaCotacao } from '../components/TabelaCotacao';
 import { ModalAvisoDuplo } from '../components/ModalAvisoDuplo';
 import { ModalDivisaoEstoque } from '../components/ModalDivisaoEstoque';
 import { ModalDeficitEstoque } from '../components/ModalDeficitEstoque';
+import { ModalCancelar } from '../components/ModalCancelar';
 import { FooterAcoes } from '../components/FooterAcoes';
 
 const AUTOSAVE_DELAY = 1500;
@@ -36,15 +37,28 @@ export default function NewProtocolPage() {
 
   const [isFinalizing, setIsFinalizing] = useState(false);
   const isFinalizingRef = useRef(false);
+  const [showCancelModal, setShowCancelModal] = useState(false);
 
   // ── Realtime & Data ──
-  const { stockProducts, stockLoading, registeredClients, registeredSealTypes } = useProtocolRealtime();
+  const { stockProducts, stockLoading, registeredClients, registeredSealTypes, clientsLoading, sealTypesLoading } = useProtocolRealtime();
 
   // ── Protocol List State ──
+  const [suppliers, setSuppliers] = useState<any[]>([]);
+  useEffect(() => {
+    import('../../../lib/actions/suppliers').then(m => {
+      m.getSuppliersAction().then(res => {
+        if (res.success && res.data) setSuppliers(res.data);
+      });
+    });
+  }, []);
+
   const {
     estoqueItems,
+    setEstoqueItems,
     aCotarItems,
+    setACotarItems,
     itemForm,
+    setItemForm,
     addFeedback,
     getFreeStock,
     handleAddItem,
@@ -58,15 +72,15 @@ export default function NewProtocolPage() {
     updateSupplierPrice,
     updateItemMarkup,
     updateItemField,
-    updateMeasurement
-  } = useProtocolState([], []);
+    updateMeasurement,
+  } = useProtocolState([], [], suppliers);
 
   const allItems = [...estoqueItems, ...aCotarItems];
 
   // ── Validation ──
   const cleanCnpjDigits = clientCnpj.replace(/\D/g, '');
   const isFormUnlocked = isNewClient
-    ? clientName.trim().length > 0 && cleanCnpjDigits.length === 14
+    ? clientName.trim().length > 0 && (cleanCnpjDigits.length === 14 || cleanCnpjDigits.length === 11)
     : clientName.trim().length > 0;
 
   const isItemFormValid =
@@ -107,7 +121,7 @@ export default function NewProtocolPage() {
         title: protocolTitle.trim() || undefined,
         items: allItems,
         totals: { subtotal: totalsObj.subtotal, markup: totalsObj.markup, total: totalsObj.total },
-        status: 'draft',
+        status: 'nao_reservado',
       });
 
       const res = await saveProtocolAction(protocol);
@@ -179,7 +193,7 @@ export default function NewProtocolPage() {
         title: protocolTitle.trim() || undefined,
         items: [...finalEstoque, ...finalACotar],
         totals: { subtotal: totalsObj.subtotal, markup: totalsObj.markup, total: totalsObj.total },
-        status: 'draft',
+        status: 'nao_reservado',
         draftForm: itemForm,
       });
 
@@ -216,7 +230,7 @@ export default function NewProtocolPage() {
         title: protocolTitle.trim() || undefined,
         items: [...finalEstoque, ...finalACotar],
         totals: { subtotal: totalsObj.subtotal, markup: totalsObj.markup, total: totalsObj.total },
-        status: 'pendente_aprovacao',
+        status: 'nao_reservado',
       });
 
       await saveProtocolAction(protocol);
@@ -230,6 +244,33 @@ export default function NewProtocolPage() {
       isFinalizingRef.current = false;
     }
   }, [canFinalize, clientName, clientCnpj, isNewClient, protocolTitle, estoqueItems, aCotarItems, router]);
+
+  const handleCancelar = useCallback(() => {
+    setShowCancelModal(true);
+  }, []);
+
+  const confirmCancelar = useCallback(async () => {
+    setShowCancelModal(false);
+    setIsFinalizing(true);
+    try {
+      const currentId = protocolIdRef.current;
+      if (typeof currentId === 'string' && currentId.startsWith('proto-')) {
+        // Not saved yet, just go back
+        router.push('/dashboard');
+        return;
+      }
+      
+      const res = await cancelarCotacaoAction(currentId);
+      if (res.success) {
+        toast.success('Cotação cancelada.');
+        router.push(`/protocolo/${currentId}`);
+      } else {
+        toast.error(res.error || 'Erro ao cancelar cotação');
+      }
+    } finally {
+      setIsFinalizing(false);
+    }
+  }, [router]);
 
   const insufficientStockItems = useMemo(() => {
     return estoqueItems.map(item => {
@@ -255,9 +296,7 @@ export default function NewProtocolPage() {
     }
   }, [insufficientStockItems.length, reallocatableItems.length, handleSaveDraft, handleEfetivar]);
 
-  const handleConfirmDeficit = useCallback(() => {
-    setShowDeficitModal(false);
-    
+  const handleConfirmDeficit = useCallback(async () => {
     const splits = insufficientStockItems.map(entry => ({
       id: entry.item.id,
       maxStock: entry.maxAvailable,
@@ -272,7 +311,7 @@ export default function NewProtocolPage() {
       const updatedEstoque = estoqueItems.map(i => {
         const split = splits.find(s => s.id === i.id);
         return split ? { ...i, quantity: split.maxStock } : i;
-      });
+      }).filter(i => i.quantity > 0);
       
       let updatedACotar = [...aCotarItems];
       for (const split of splits) {
@@ -304,8 +343,9 @@ export default function NewProtocolPage() {
         }
       }
 
-      if (saveActionType === 'draft') handleSaveDraft(updatedEstoque, updatedACotar);
-      else if (saveActionType === 'efetivar') handleEfetivar(updatedEstoque, updatedACotar);
+      if (saveActionType === 'draft') await handleSaveDraft(updatedEstoque, updatedACotar);
+      else if (saveActionType === 'efetivar') await handleEfetivar(updatedEstoque, updatedACotar);
+      setShowDeficitModal(false);
     }
   }, [insufficientStockItems, reallocatableItems, splitMultipleEstoqueItems, saveActionType, handleSaveDraft, handleEfetivar, estoqueItems, aCotarItems, areItemsMatching]);
 
@@ -320,18 +360,22 @@ export default function NewProtocolPage() {
       const currentQty = Number(targetItem.quantity);
       const qtyToMove = Math.min(currentQty, freeStock);
 
+      const identifier = item.code || item.oem || item.name;
+      const product = stockProducts.find(p => (p.code || p.sku || p.name) === identifier);
+      const costPrice = product ? product.costPrice : 0;
+
       const newEstoqueItem: ProtocolItem = {
         ...targetItem,
-        id: `item-${Date.now()}-${Math.random()}`,
+        id: `item-${Date.now()}-${Math.random().toString(36).substring(2, 9)}-e`,
         type: 'estoque',
         quantity: qtyToMove,
         supplierPrices: {},
         chosenSupplier: undefined,
         chosenSupplierType: undefined,
         markupPercent: 70,
-        costPrice: 0,
-        unitPrice: 0,
-        salePrice: 0,
+        costPrice: costPrice,
+        unitPrice: costPrice,
+        salePrice: costPrice * 1.7,
         needsApproval: false,
       };
 
@@ -352,15 +396,20 @@ export default function NewProtocolPage() {
       }
     }
 
-    setShowReallocModal(false);
+    setEstoqueItems(updatedEstoque);
+    setACotarItems(updatedACotar);
+
     if (saveActionType === 'draft') await handleSaveDraft(updatedEstoque, updatedACotar);
     else if (saveActionType === 'efetivar') await handleEfetivar(updatedEstoque, updatedACotar);
-  }, [reallocatableItems, estoqueItems, aCotarItems, saveActionType, handleSaveDraft, handleEfetivar, areItemsMatching]);
+    
+    setShowReallocModal(false);
+  }, [reallocatableItems, estoqueItems, aCotarItems, saveActionType, handleSaveDraft, handleEfetivar, areItemsMatching, setEstoqueItems, setACotarItems]);
 
   const handleConfirmIgnore = useCallback(async () => {
-    setShowReallocModal(false);
     if (saveActionType === 'draft') await handleSaveDraft();
     else if (saveActionType === 'efetivar') await handleEfetivar();
+    
+    setShowReallocModal(false);
   }, [saveActionType, handleSaveDraft, handleEfetivar]);
 
   const totals = calculateTotals(allItems);
@@ -384,6 +433,7 @@ export default function NewProtocolPage() {
         protocolTitle={protocolTitle}
         setProtocolTitle={setProtocolTitle}
         autoSaveStatus={autoSaveStatus}
+        clientsLoading={clientsLoading}
       />
 
       <FormularioAdicaoItem
@@ -400,6 +450,7 @@ export default function NewProtocolPage() {
         stockLoading={stockLoading}
         allItemsCount={allItems.length}
         getFreeStock={getFreeStock}
+        sealTypesLoading={sealTypesLoading}
       />
 
       <TabelaEstoque
@@ -412,23 +463,29 @@ export default function NewProtocolPage() {
 
       <TabelaCotacao
         items={aCotarItems}
+        suppliers={suppliers}
         estoqueItemsCount={estoqueItems.length}
         updateQuantity={updateACotarItemQuantity}
         removeItem={removeACotarItem}
         updateSupplierPrice={updateSupplierPrice}
         updateItemMarkup={updateItemMarkup}
-        handleReallocate={handleReallocate}
+        handleReallocate={(id, qty) => handleReallocate(id, qty, stockProducts)}
         getFreeStock={(identifier) => getFreeStock(identifier, stockProducts)}
       />
 
       <FooterAcoes
         totals={totals}
         canFinalize={canFinalize}
-        allItemsCount={allItems.length}
-        triggerSaveCheck={triggerSaveCheck}
+        allItemsCount={countUniqueProtocolItems(allItems)}
         isViewing={false}
-        protocolStatus={'draft'}
+        protocolStatus={'nao_reservado'}
         isLoading={isFinalizing}
+        canSendToBling={false}
+        onSaveDraft={() => triggerSaveCheck('draft')}
+        onReservar={() => triggerSaveCheck('efetivar')}
+        onEnviarBling={() => {}}
+        onCancelar={handleCancelar}
+        onEstornar={() => {}}
       />
 
       <ModalAvisoDuplo
@@ -453,6 +510,14 @@ export default function NewProtocolPage() {
         isOpen={showDeficitModal}
         deficitItems={insufficientStockItems}
         onConfirm={handleConfirmDeficit}
+        onClose={() => setShowDeficitModal(false)}
+        isLoading={isFinalizing}
+      />
+
+      <ModalCancelar
+        isOpen={showCancelModal}
+        onClose={() => setShowCancelModal(false)}
+        onConfirm={confirmCancelar}
         isLoading={isFinalizing}
       />
     </section>

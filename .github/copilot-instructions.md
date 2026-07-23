@@ -23,6 +23,7 @@ Este projeto é um **MVP full-stack** para um sistema interno de cotação e ven
 - **Compreensão:** Analise o contexto existente, a abstração Maestro, as regras do Supabase e as funções em `/lib`.
 - **Planejamento:** Para features que modifiquem a arquitetura, apresente sempre o plano, detalhando como o componente será quebrado e quais hooks serão criados.
 - **Ação:** Execute comandos e modifique arquivos autonomamente via ferramentas. Evite pedir para o usuário fazer o trabalho mecânico.
+- **Mudanças Externas:** Se alterações externas (como migrações em banco de dados Supabase, configurações em portais externos ou chaves de API) forem necessárias e a IA não for capaz de executá-las diretamente, ela deve especificar claramente os passos e comandos necessários para o usuário executar (ex: disponibilizar o script SQL de ALTER TABLE exato).
 - **Código:**
   - Aplique SOLID e DRY. Separe lógicas visuais e de negócio.
   - Utilize Zod nas Server Actions.

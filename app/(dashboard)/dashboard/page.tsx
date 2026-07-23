@@ -4,8 +4,11 @@ import Link from 'next/link';
 import { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { getProtocolsAction, updateProtocolStatusAction } from '../../lib/actions/protocols';
+import { formatCurrency, countUniqueProtocolItems } from '../../lib/utils/protocolFormatters';
 import { calculateTotals } from '../../lib/services/protocolService';
+import { distributeItemsToKanban } from '../../lib/services/kanbanService';
 import type { Protocol } from '../../lib/types/database';
+import { CustomDateRangePicker } from '../../components/CustomDateRangePicker';
 
 
 export default function DashboardPage() {
@@ -16,8 +19,8 @@ export default function DashboardPage() {
   const [filterClient, setFilterClient] = useState('');
   const [filterProtocol, setFilterProtocol] = useState('');
   const [filterDateMode, setFilterDateMode] = useState<'all' | 'today' | 'yesterday' | 'custom'>('all');
-  const [filterDateStart, setFilterDateStart] = useState('');
-  const [filterDateEnd, setFilterDateEnd] = useState('');
+  const [filterDateStart, setFilterDateStart] = useState<Date | undefined>();
+  const [filterDateEnd, setFilterDateEnd] = useState<Date | undefined>();
 
   // Calculate total sales value using the same logic as the protocol page
   const calculateTotalVenda = (protocol: Protocol): number => {
@@ -60,22 +63,24 @@ export default function DashboardPage() {
   };
 
   // Helper for Status Badge
-  const getStatusBadge = (status: Protocol['status']) => {
+  const getStatusBadge = (status: Protocol['status'] | string) => {
     switch (status) {
+      case 'nao_reservado':
       case 'draft':
-        return { label: 'Rascunho', className: 'bg-slate-100 text-slate-700 border-slate-200' };
       case 'in_progress':
-        return { label: 'Em andamento', className: 'bg-blue-50 text-blue-700 border-blue-200' };
-      case 'separating':
-        return { label: 'Em separação', className: 'bg-indigo-50 text-indigo-700 border-indigo-200' };
       case 'in_review':
-        return { label: 'Aguardando fornecedor', className: 'bg-amber-50 text-amber-700 border-amber-200' };
       case 'rejected':
-        return { label: 'Aguardando aprovação', className: 'bg-purple-50 text-purple-700 border-purple-200' };
+        return { label: 'Estoque Não Reservado', className: 'bg-slate-100 text-slate-700 border-slate-200' };
+      case 'reservado':
+      case 'separating':
+        return { label: 'Estoque Reservado', className: 'bg-blue-50 text-blue-700 border-blue-200' };
+      case 'finalizado':
       case 'approved':
         return { label: 'Finalizado', className: 'bg-emerald-50 text-emerald-700 border-emerald-200' };
+      case 'cancelado':
+        return { label: 'Cancelado', className: 'bg-red-50 text-red-700 border-red-200' };
       default:
-        return { label: 'Em andamento', className: 'bg-slate-100 text-slate-700 border-slate-200' };
+        return { label: String(status), className: 'bg-slate-50 text-slate-700 border-slate-200' };
     }
   };
 
@@ -91,18 +96,21 @@ export default function DashboardPage() {
     });
 
     return list.filter((p) => {
-      if (termClient && !p.clientName.toLowerCase().includes(termClient)) {
+      // 1. Client
+      if (filterClient && !p.clientName.toLowerCase().includes(filterClient.toLowerCase())) {
         return false;
       }
       
-      if (termProto) {
+      // 2. Protocol Number (UUID start or ID if any)
+      if (filterProtocol) {
         const protNum = formatProtocolNumber(p.id).toLowerCase();
         const rawId = String(p.id).toLowerCase();
-        if (!protNum.includes(termProto) && !rawId.includes(termProto)) {
+        if (!protNum.includes(filterProtocol.toLowerCase()) && !rawId.includes(filterProtocol.toLowerCase())) {
           return false;
         }
       }
 
+      // 3. Date
       if (filterDateMode !== 'all') {
         const protocolDate = new Date(p.updatedAt || p.createdAt);
         if (!isNaN(protocolDate.getTime())) {
@@ -123,12 +131,12 @@ export default function DashboardPage() {
             if (filterDateStart) {
               const start = new Date(filterDateStart);
               start.setHours(0, 0, 0, 0);
-              if (protocolDate.getTime() < start.getTime() + start.getTimezoneOffset() * 60000) return false;
+              if (protocolDate.getTime() < start.getTime()) return false;
             }
             if (filterDateEnd) {
               const end = new Date(filterDateEnd);
               end.setHours(23, 59, 59, 999);
-              if (protocolDate.getTime() > end.getTime() + end.getTimezoneOffset() * 60000) return false;
+              if (protocolDate.getTime() > end.getTime()) return false;
             }
           }
         }
@@ -140,18 +148,18 @@ export default function DashboardPage() {
 
   // Group by status for Kanban (Each sorted by edit date since it derives from filteredProtocols)
   const kanbanColumns = useMemo(() => {
+    const distributed = distributeItemsToKanban(filteredProtocols);
     const columns = [
-      { key: 'draft' as const, title: 'Rascunho', tone: 'bg-slate-50 text-slate-800 border-slate-200', dot: 'bg-slate-500' },
-      { key: 'in_progress' as const, title: 'Em andamento', tone: 'bg-blue-50 text-blue-800 border-blue-200', dot: 'bg-blue-500' },
-      { key: 'separating' as const, title: 'Em separação', tone: 'bg-indigo-50 text-indigo-800 border-indigo-200', dot: 'bg-indigo-500' },
-      { key: 'rejected' as const, title: 'Aguardando aprovação', tone: 'bg-purple-50 text-purple-800 border-purple-200', dot: 'bg-purple-500' },
-      { key: 'in_review' as const, title: 'Aguardando fornecedor', tone: 'bg-amber-50 text-amber-800 border-amber-200', dot: 'bg-amber-500' },
-      { key: 'approved' as const, title: 'Finalizados', tone: 'bg-emerald-50 text-emerald-800 border-emerald-200', dot: 'bg-emerald-500' },
+      { key: 'estoque_nao_reservado' as const, title: 'Estoque Não Reservado', tone: 'bg-slate-50 text-slate-800 border-slate-200', dot: 'bg-slate-500' },
+      { key: 'aguardando_fornecedor' as const, title: 'Aguardando Fornecedor', tone: 'bg-amber-50 text-amber-800 border-amber-200', dot: 'bg-amber-500' },
+      { key: 'aguardando_aprovacao' as const, title: 'Aguardando Aprovação', tone: 'bg-purple-50 text-purple-800 border-purple-200', dot: 'bg-purple-500' },
+      { key: 'em_separacao' as const, title: 'Em Separação', tone: 'bg-indigo-50 text-indigo-800 border-indigo-200', dot: 'bg-indigo-500' },
+      { key: 'finalizados' as const, title: 'Finalizados', tone: 'bg-emerald-50 text-emerald-800 border-emerald-200', dot: 'bg-emerald-500' },
     ];
 
     return columns.map((col) => ({
       ...col,
-      items: filteredProtocols.filter((p) => p.status === col.key),
+      items: distributed[col.key],
     }));
   }, [filteredProtocols]);
 
@@ -188,15 +196,30 @@ export default function DashboardPage() {
             </p>
           </div>
 
-          <Link
-            href="/protocolo/novo"
-            className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#F7C00C] px-5 py-3 text-sm font-bold text-slate-950 shadow-lg shadow-amber-500/10 transition-all hover:bg-[#E8B600] focus:ring-2 focus:ring-[#F7C00C] focus:ring-offset-2 focus:ring-offset-slate-900 shrink-0"
-          >
-            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
-            </svg>
-            Novo Protocolo
-          </Link>
+          <div className="flex items-center gap-3 shrink-0">
+            {user?.role === 'admin' && (
+              <Link
+                href="/admin/dashboard"
+                className="inline-flex items-center justify-center gap-2 rounded-2xl bg-slate-800 px-5 py-3 text-sm font-bold text-white shadow-lg transition-all hover:bg-slate-700 focus:ring-2 focus:ring-slate-400 focus:ring-offset-2 focus:ring-offset-slate-900"
+              >
+                <svg className="h-5 w-5 text-slate-300" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                </svg>
+                Área Administrativa
+              </Link>
+            )}
+
+            <Link
+              href="/protocolo/novo"
+              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#F7C00C] px-5 py-3 text-sm font-bold text-slate-950 shadow-lg shadow-amber-500/10 transition-all hover:bg-[#E8B600] focus:ring-2 focus:ring-[#F7C00C] focus:ring-offset-2 focus:ring-offset-slate-900"
+            >
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+              </svg>
+              Novo Protocolo
+            </Link>
+          </div>
         </div>
       </div>
 
@@ -243,62 +266,77 @@ export default function DashboardPage() {
         </div>
 
         {/* Filters Grid */}
-        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-3 pt-2 border-t border-slate-100">
-          <div>
-            <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">Cliente</label>
-            <input
-              type="text"
-              value={filterClient}
-              onChange={(e) => setFilterClient(e.target.value)}
-              placeholder="Ex: Força Máxima"
-              className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-800 placeholder-slate-400 outline-none transition focus:border-slate-400 focus:bg-white"
-            />
-          </div>
-          <div>
-            <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">Protocolo</label>
-            <input
-              type="text"
-              value={filterProtocol}
-              onChange={(e) => setFilterProtocol(e.target.value)}
-              placeholder="Nº do protocolo"
-              className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-800 placeholder-slate-400 outline-none transition focus:border-slate-400 focus:bg-white"
-            />
-          </div>
-          <div>
-            <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">Período</label>
-            <select
-              value={filterDateMode}
-              onChange={(e) => setFilterDateMode(e.target.value as any)}
-              className="w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 text-xs text-slate-800 outline-none transition focus:border-slate-400 focus:bg-white cursor-pointer"
-            >
-              <option value="all">Todo tempo</option>
-              <option value="today">Hoje</option>
-              <option value="yesterday">Ontem</option>
-              <option value="custom">Personalizado</option>
-            </select>
-          </div>
-          {filterDateMode === 'custom' && (
-            <div className="flex gap-2">
-              <div className="flex-1">
-                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">Início</label>
-                <input
-                  type="date"
-                  value={filterDateStart}
-                  onChange={(e) => setFilterDateStart(e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 bg-slate-50 px-2 py-2 text-xs text-slate-800 outline-none transition focus:border-slate-400 focus:bg-white"
-                />
-              </div>
-              <div className="flex-1">
-                <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">Fim</label>
-                <input
-                  type="date"
-                  value={filterDateEnd}
-                  onChange={(e) => setFilterDateEnd(e.target.value)}
-                  className="w-full rounded-lg border border-slate-200 bg-slate-50 px-2 py-2 text-xs text-slate-800 outline-none transition focus:border-slate-400 focus:bg-white"
-                />
-              </div>
+        <div className="grid grid-cols-1 md:grid-cols-12 gap-4 pt-3 border-t border-slate-100">
+          <div className="md:col-span-3">
+            <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">Cliente</label>
+            <div className="relative">
+              <svg className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+              </svg>
+              <input
+                type="text"
+                value={filterClient}
+                onChange={(e) => setFilterClient(e.target.value)}
+                placeholder="Buscar cliente..."
+                className="w-full rounded-xl border border-slate-200 bg-slate-50/50 pl-9 pr-3 py-2 text-xs font-medium text-slate-800 placeholder-slate-400 outline-none transition focus:border-[#F7C00C] focus:bg-white focus:ring-4 focus:ring-[#F7C00C]/10"
+              />
             </div>
-          )}
+          </div>
+          
+          <div className="md:col-span-3">
+            <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">Nº Protocolo</label>
+            <div className="relative">
+              <svg className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14" />
+              </svg>
+              <input
+                type="text"
+                value={filterProtocol}
+                onChange={(e) => setFilterProtocol(e.target.value)}
+                placeholder="Ex: 1234"
+                className="w-full rounded-xl border border-slate-200 bg-slate-50/50 pl-9 pr-3 py-2 text-xs font-medium text-slate-800 placeholder-slate-400 outline-none transition focus:border-[#F7C00C] focus:bg-white focus:ring-4 focus:ring-[#F7C00C]/10"
+              />
+            </div>
+          </div>
+          
+          <div className="md:col-span-6">
+            <label className="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1.5">Período</label>
+            <div className="flex flex-wrap items-center gap-2">
+              {/* Pill Selector */}
+              <div className="flex bg-slate-100/80 p-1 rounded-xl border border-slate-200/60 w-fit">
+                {[
+                  { id: 'all', label: 'Todo o tempo' },
+                  { id: 'today', label: 'Hoje' },
+                  { id: 'yesterday', label: 'Ontem' },
+                  { id: 'custom', label: 'Personalizado' },
+                ].map((mode) => (
+                  <button
+                    key={mode.id}
+                    onClick={() => setFilterDateMode(mode.id as any)}
+                    className={`px-3 py-1.5 text-[11px] font-bold rounded-lg transition-all ${
+                      filterDateMode === mode.id
+                        ? 'bg-white text-slate-800 shadow-sm border border-slate-200'
+                        : 'text-slate-500 hover:text-slate-700 hover:bg-slate-200/50'
+                    }`}
+                  >
+                    {mode.label}
+                  </button>
+                ))}
+              </div>
+
+              {/* Custom DateRangePicker Dual */}
+              {filterDateMode === 'custom' && (
+                <div className="animate-in fade-in slide-in-from-left-2 duration-200">
+                  <CustomDateRangePicker
+                    startDate={filterDateStart}
+                    setStartDate={setFilterDateStart}
+                    endDate={filterDateEnd}
+                    setEndDate={setFilterDateEnd}
+                  />
+                </div>
+              )}
+            </div>
+          </div>
         </div>
       </div>
 
@@ -386,7 +424,10 @@ export default function DashboardPage() {
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-center">
                           <span className="inline-flex items-center gap-1 text-xs font-medium text-slate-600 bg-slate-50 border border-slate-200 px-2.5 py-0.5 rounded-full">
-                            {protocol.items?.length || 0} {protocol.items?.length === 1 ? 'item' : 'itens'}
+                            {(() => {
+                              const uniqueCount = countUniqueProtocolItems(protocol.items);
+                              return `${uniqueCount} ${uniqueCount === 1 ? 'item' : 'itens'}`;
+                            })()}
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right">
@@ -455,46 +496,50 @@ export default function DashboardPage() {
               <div className="space-y-3 flex-1 overflow-y-auto max-h-[500px] pr-1">
                 {col.items.length === 0 ? (
                   <div className="rounded-2xl border border-dashed border-slate-200 bg-white/50 p-6 text-center text-xs text-slate-400">
-                    Nenhum protocolo neste status.
+                    Nenhum item neste status.
                   </div>
                 ) : (
-                  col.items.map((protocol) => {
-                    const totalVenda = calculateTotalVenda(protocol);
-                    const protNum = formatProtocolNumber(protocol.id);
+                  col.items.map((item) => {
+                    const protNum = formatProtocolNumber(item.protocolId);
 
                     return (
                       <div
-                        key={protocol.id}
+                        key={item.id}
                         className="group relative block rounded-2xl border border-slate-200/80 bg-white p-4 shadow-xs transition-all hover:border-slate-400 hover:shadow-md cursor-default"
                       >
-                        <div className="flex items-center justify-between">
-                          <span className="font-mono text-[10px] font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md">
-                            {protNum}
-                          </span>
-                          <span className="text-[10px] text-slate-400">
-                            {formatDate(protocol.updatedAt || protocol.createdAt).split(' ')[0]}
+                        <div className="flex items-center justify-between gap-1">
+                          <div className="flex items-center gap-1.5">
+                            <span className="font-mono text-[10px] font-bold text-slate-700 bg-slate-100 px-2 py-0.5 rounded-md">
+                              Proto {protNum}
+                            </span>
+                            <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded uppercase tracking-wider ${item.type === 'estoque' ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                              {item.type === 'estoque' ? 'Estoque' : 'A Cotar'}
+                            </span>
+                          </div>
+                          <span className="text-[10px] text-slate-400 truncate max-w-[80px]">
+                            {item.clientName}
                           </span>
                         </div>
 
                         <h4 className="mt-2.5 text-xs font-bold text-slate-900 line-clamp-2">
-                          {protocol.clientName}
+                          {item.name || item.code || item.oem || 'Item sem nome'}
                         </h4>
 
                         <div className="mt-4 flex items-center justify-between border-t border-slate-100 pt-3 text-[11px]">
                           <span className="text-slate-500">
-                            {protocol.items?.length || 0} {protocol.items?.length === 1 ? 'item' : 'itens'}
+                            Qtd: {item.quantity}
                           </span>
                           <span className="font-bold text-slate-900">
-                            {formatCurrency(totalVenda)}
+                            {formatCurrency(item.salePrice || 0)}
                           </span>
                         </div>
 
                         <div className="mt-2 text-right">
                           <Link
-                            href={`/protocolo/${protocol.id}`}
+                            href={`/protocolo/${item.protocolId}`}
                             className="inline-flex items-center gap-0.5 text-[10px] font-bold text-slate-500 hover:text-slate-900"
                           >
-                            Abrir
+                            Abrir Cotação
                             <svg className="h-3 w-3" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                             </svg>

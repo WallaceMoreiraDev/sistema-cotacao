@@ -1,10 +1,11 @@
 import { Fragment } from 'react';
-import type { ProtocolItem } from '../../../lib/types/database';
+import type { ProtocolItem, StockHolder } from '../../../lib/types/database';
 
 interface ModalDeficitEstoqueProps {
   isOpen: boolean;
-  deficitItems: { item: ProtocolItem; maxAvailable: number; deficit: number }[];
+  deficitItems: { item: ProtocolItem; maxAvailable: number; deficit: number; heldBy?: StockHolder[] }[];
   onConfirm: () => void;
+  onClose?: () => void;
   isLoading?: boolean;
 }
 
@@ -12,6 +13,7 @@ export function ModalDeficitEstoque({
   isOpen,
   deficitItems,
   onConfirm,
+  onClose,
   isLoading,
 }: ModalDeficitEstoqueProps) {
   if (!isOpen) return null;
@@ -19,7 +21,7 @@ export function ModalDeficitEstoque({
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-slate-900/60 p-4 backdrop-blur-sm animate-in fade-in duration-200">
       <div className="w-full max-w-lg rounded-2xl bg-white shadow-2xl animate-in zoom-in-95 duration-200 overflow-hidden flex flex-col max-h-[90vh]">
-        <div className="bg-red-500/10 p-5 border-b border-red-500/20 shrink-0">
+        <div className="bg-red-500/10 p-5 border-b border-red-500/20 shrink-0 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-full bg-red-100 text-red-600">
               <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -31,6 +33,18 @@ export function ModalDeficitEstoque({
               <p className="text-xs text-slate-500 mt-0.5">Estes itens perderam disponibilidade enquanto você editava.</p>
             </div>
           </div>
+          {onClose && (
+            <button
+              onClick={onClose}
+              disabled={isLoading}
+              className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition"
+              title="Fechar"
+            >
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+              </svg>
+            </button>
+          )}
         </div>
         
         <div className="p-5 overflow-y-auto space-y-4">
@@ -51,15 +65,34 @@ export function ModalDeficitEstoque({
               </thead>
               <tbody className="divide-y divide-slate-200">
                 {deficitItems.map((entry, idx) => (
-                  <tr key={idx} className="bg-white">
-                    <td className="px-3 py-2.5">
-                      <p className="font-semibold text-slate-800">{entry.item.name}</p>
-                      <p className="text-[10px] text-slate-500">{entry.item.code || entry.item.oem || '-'}</p>
-                    </td>
-                    <td className="px-3 py-2.5 text-center font-medium text-slate-600">{entry.item.quantity}</td>
-                    <td className="px-3 py-2.5 text-center font-bold text-emerald-600">{entry.maxAvailable}</td>
-                    <td className="px-3 py-2.5 text-center font-bold text-red-600">-{entry.deficit}</td>
-                  </tr>
+                  <Fragment key={idx}>
+                    <tr className="bg-white">
+                      <td className="px-3 py-2.5">
+                        <p className="font-semibold text-slate-800">{entry.item.name}</p>
+                        <p className="text-[10px] text-slate-500">{entry.item.code || entry.item.oem || '-'}</p>
+                      </td>
+                      <td className="px-3 py-2.5 text-center font-medium text-slate-600">{entry.item.quantity}</td>
+                      <td className="px-3 py-2.5 text-center font-bold text-emerald-600">{entry.maxAvailable}</td>
+                      <td className="px-3 py-2.5 text-center font-bold text-red-600">-{entry.deficit}</td>
+                    </tr>
+                    {entry.heldBy && entry.heldBy.length > 0 && (
+                      <tr className="bg-slate-50/50">
+                        <td colSpan={4} className="px-3 py-2 text-xs">
+                          <div className="flex flex-col gap-1 rounded-md border border-amber-200 bg-amber-50 p-2.5 text-amber-800">
+                            <span className="font-semibold text-[10px] uppercase tracking-wider opacity-70">Em uso nos protocolos:</span>
+                            <ul className="space-y-1 mt-1">
+                              {entry.heldBy.map((holder, hIdx) => (
+                                <li key={hIdx} className="flex justify-between items-center border-b border-amber-200/50 pb-1 last:border-0 last:pb-0">
+                                  <span>#{holder.protocolId} - {holder.clientName} {holder.title ? `(${holder.title})` : ''}</span>
+                                  <span className="font-medium bg-amber-100/50 px-1.5 py-0.5 rounded text-[10px]">{holder.quantity} un.</span>
+                                </li>
+                              ))}
+                            </ul>
+                          </div>
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
                 ))}
               </tbody>
             </table>
@@ -67,10 +100,21 @@ export function ModalDeficitEstoque({
         </div>
 
         <div className="flex items-center gap-3 border-t border-slate-100 bg-slate-50 p-4 shrink-0">
+          {onClose && (
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={isLoading}
+              className="rounded-xl border border-slate-300 bg-white px-4 py-2.5 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50 disabled:opacity-50"
+            >
+              Voltar
+            </button>
+          )}
           <button
+            type="button"
             onClick={onConfirm}
             disabled={isLoading}
-            className="w-full rounded-xl bg-red-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-red-700 disabled:opacity-50 flex justify-center items-center gap-2"
+            className="flex-1 rounded-xl bg-red-600 px-4 py-2.5 text-sm font-bold text-white shadow-sm transition hover:bg-red-700 disabled:opacity-50 flex justify-center items-center gap-2"
           >
             {isLoading ? (
               <svg className="animate-spin h-4 w-4 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">

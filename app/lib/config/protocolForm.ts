@@ -16,6 +16,7 @@ export interface ItemFormState {
   oem: string;
   nickname: string;
   code: string;
+  brand: string;
   quantity: string;
   ignoreStock: boolean;
   measurements: Record<MeasurementKey, string>;
@@ -26,6 +27,7 @@ export const EMPTY_ITEM_FORM: ItemFormState = {
   oem: '',
   nickname: '',
   code: '',
+  brand: '',
   quantity: '',
   ignoreStock: false,
   measurements: {

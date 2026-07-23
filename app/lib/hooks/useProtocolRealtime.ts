@@ -11,7 +11,10 @@ export function useProtocolRealtime(protocolId?: number) {
   const [stockLoading, setStockLoading] = useState(true);
   
   const [registeredClients, setRegisteredClients] = useState<Client[]>([]);
+  const [clientsLoading, setClientsLoading] = useState(true);
+  
   const [registeredSealTypes, setRegisteredSealTypes] = useState<SealType[]>([]);
+  const [sealTypesLoading, setSealTypesLoading] = useState(true);
 
   const refreshStockData = useCallback(async () => {
     try {
@@ -22,10 +25,11 @@ export function useProtocolRealtime(protocolId?: number) {
       
       const realProducts = products.map(p => {
         const identifier = p.code || p.sku || p.name;
-        const reserved = reservations[identifier] || 0;
+        const reservedData = reservations[identifier] || { total: 0, heldBy: [] };
         return {
           ...p,
-          stock: Math.max(0, p.stock - reserved)
+          stock: Math.max(0, p.stock - reservedData.total),
+          heldBy: reservedData.heldBy
         };
       });
       
@@ -45,13 +49,20 @@ export function useProtocolRealtime(protocolId?: number) {
 
     // Supabase Realtime Subscription
     const supabase = createClient();
-    const channelName = protocolId ? `protocol-items-changes-${protocolId}` : 'protocol-items-changes-novo';
+    const channelName = protocolId ? `protocol-changes-${protocolId}` : 'protocol-changes-novo';
     
     const channel = supabase.channel(channelName)
       .on('postgres_changes', { 
         event: '*', 
         schema: 'public', 
         table: 'protocol_items' 
+      }, () => {
+        refreshStockData();
+      })
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'protocols' 
       }, () => {
         refreshStockData();
       })
@@ -62,12 +73,14 @@ export function useProtocolRealtime(protocolId?: number) {
       if (!cancelled && res.success && res.data) {
         setRegisteredClients(res.data); 
       }
+      if (!cancelled) setClientsLoading(false);
     });
     
     getSealTypesAction().then(res => { 
       if (!cancelled && res.success && res.data) {
         setRegisteredSealTypes(res.data); 
       }
+      if (!cancelled) setSealTypesLoading(false);
     });
 
     return () => { 
@@ -82,6 +95,8 @@ export function useProtocolRealtime(protocolId?: number) {
     stockLoading, 
     registeredClients, 
     registeredSealTypes, 
-    refreshStockData 
+    refreshStockData,
+    clientsLoading,
+    sealTypesLoading
   };
 }

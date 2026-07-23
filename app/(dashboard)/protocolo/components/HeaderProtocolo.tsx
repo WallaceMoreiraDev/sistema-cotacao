@@ -1,6 +1,6 @@
 import { useState, useMemo } from 'react';
 import type { Client } from '../../../lib/types/database';
-import { formatCnpjMask } from '../../../lib/utils/protocolFormatters';
+import { formatCnpjMask, formatCpfMask } from '../../../lib/utils/protocolFormatters';
 
 interface HeaderProtocoloProps {
   clientName: string;
@@ -15,6 +15,7 @@ interface HeaderProtocoloProps {
   protocolStatus?: string;
   autoSaveStatus: 'idle' | 'saving' | 'saved';
   isViewing?: boolean;
+  clientsLoading?: boolean;
 }
 
 export function HeaderProtocolo({
@@ -27,11 +28,13 @@ export function HeaderProtocolo({
   registeredClients,
   protocolTitle,
   setProtocolTitle,
-  protocolStatus = 'Rascunho',
+  protocolStatus = 'draft',
   autoSaveStatus,
   isViewing = false,
+  clientsLoading = false,
 }: HeaderProtocoloProps) {
   const [isClientDropdownOpen, setIsClientDropdownOpen] = useState(false);
+  const [clientType, setClientType] = useState<'pj' | 'pf'>('pj');
 
   const cleanCnpjDigits = clientCnpj.replace(/\D/g, '');
 
@@ -62,20 +65,22 @@ export function HeaderProtocolo({
 
   const getStatusBadge = (status: string) => {
     switch (status) {
+      case 'nao_reservado':
       case 'draft':
-        return { label: 'Rascunho', className: 'bg-slate-500/20 text-slate-300 border-slate-500/30' };
       case 'in_progress':
-        return { label: 'Em andamento', className: 'bg-blue-500/20 text-blue-300 border-blue-500/30' };
-      case 'separating':
-        return { label: 'Em separação', className: 'bg-indigo-500/20 text-indigo-300 border-indigo-500/30' };
       case 'in_review':
-        return { label: 'Aguardando fornecedor', className: 'bg-amber-500/20 text-amber-300 border-amber-500/30' };
       case 'rejected':
-        return { label: 'Aguardando aprovação', className: 'bg-purple-500/20 text-purple-300 border-purple-500/30' };
+        return { label: 'Estoque Não Reservado', className: 'bg-slate-500/30 text-slate-300 border-slate-500/40' };
+      case 'reservado':
+      case 'separating':
+        return { label: 'Estoque Reservado', className: 'bg-blue-500/30 text-blue-200 border-blue-400/50' };
+      case 'finalizado':
       case 'approved':
-        return { label: 'Finalizado', className: 'bg-emerald-500/20 text-emerald-300 border-emerald-500/30' };
+        return { label: 'Finalizado', className: 'bg-emerald-500/30 text-emerald-200 border-emerald-400/50' };
+      case 'cancelado':
+        return { label: 'Cancelado', className: 'bg-red-500/30 text-red-200 border-red-400/50' };
       default:
-        return { label: 'Em andamento', className: 'bg-slate-500/20 text-slate-300 border-slate-500/30' };
+        return { label: String(status), className: 'bg-slate-500/30 text-slate-300 border-slate-500/40' };
     }
   };
 
@@ -116,22 +121,32 @@ export function HeaderProtocolo({
                   <span className="rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 text-[9px]">Cliente Cadastrado</span>
                 ) : null}
               </label>
-              <input
-                type="text"
-                value={clientName}
-                onFocus={() => setIsClientDropdownOpen(true)}
-                onChange={(e) => {
-                  setClientName(e.target.value);
-                  setIsClientDropdownOpen(true);
-                }}
-                onBlur={handleClientBlur}
-                placeholder="Digite para buscar ou cadastrar..."
-                className={`w-full rounded-xl border px-4 py-2.5 text-sm font-medium text-white bg-white/5 placeholder-slate-500 outline-none transition ${
-                  clientName.trim() ? 'border-slate-600 focus:border-[#F7C00C]' : 'border-amber-500/60 ring-1 ring-amber-500/20'
-                }`}
-              />
+              <div className="relative">
+                <input
+                  type="text"
+                  value={clientName}
+                  onFocus={() => setIsClientDropdownOpen(true)}
+                  onChange={(e) => {
+                    setClientName(e.target.value);
+                    setIsClientDropdownOpen(true);
+                  }}
+                  onBlur={handleClientBlur}
+                  placeholder="Digite para buscar ou cadastrar..."
+                  className={`w-full rounded-xl border px-4 py-2.5 text-sm font-medium text-white bg-white/5 placeholder-slate-500 outline-none transition ${
+                    clientName.trim() ? 'border-slate-600 focus:border-[#F7C00C]' : 'border-amber-500/60 ring-1 ring-amber-500/20'
+                  }`}
+                />
+                {clientsLoading && (
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2">
+                    <svg className="h-4 w-4 animate-spin text-slate-400" fill="none" viewBox="0 0 24 24">
+                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4z" />
+                    </svg>
+                  </div>
+                )}
+              </div>
 
-              {isClientDropdownOpen && filteredClients.length > 0 && !isViewing && (
+              {isClientDropdownOpen && !clientsLoading && filteredClients.length > 0 && !isViewing && (
                 <div className="absolute left-0 right-0 top-full z-30 mt-1 max-h-48 overflow-y-auto rounded-xl border border-slate-700 bg-slate-900 p-1.5 shadow-2xl">
                   <p className="px-2 py-1 text-[9px] font-bold uppercase tracking-wider text-slate-400">Clientes Cadastrados</p>
                   {filteredClients.map((client) => (
@@ -155,21 +170,41 @@ export function HeaderProtocolo({
 
             {isNewClient ? (
               <div>
-                <label className="block text-[11px] font-semibold uppercase tracking-wider text-amber-400 mb-1.5">
-                  CNPJ do Novo Cliente *
-                </label>
+                <div className="flex items-center justify-between mb-1.5">
+                  <label className="block text-[11px] font-semibold uppercase tracking-wider text-amber-400">
+                    Documento do Novo Cliente *
+                  </label>
+                  <div className="flex items-center gap-2 text-[10px] bg-slate-800/50 rounded-lg p-0.5">
+                    <button 
+                      type="button"
+                      onClick={() => { setClientType('pj'); setClientCnpj(''); }}
+                      className={`px-2 py-0.5 rounded-md transition ${clientType === 'pj' ? 'bg-amber-500/20 text-amber-300' : 'text-slate-400 hover:text-slate-200'}`}
+                    >
+                      CNPJ
+                    </button>
+                    <button 
+                      type="button"
+                      onClick={() => { setClientType('pf'); setClientCnpj(''); }}
+                      className={`px-2 py-0.5 rounded-md transition ${clientType === 'pf' ? 'bg-amber-500/20 text-amber-300' : 'text-slate-400 hover:text-slate-200'}`}
+                    >
+                      CPF
+                    </button>
+                  </div>
+                </div>
                 <input
                   type="text"
                   value={clientCnpj}
-                  onChange={(e) => setClientCnpj(formatCnpjMask(e.target.value))}
-                  placeholder="00.000.000/0000-00"
-                  maxLength={18}
+                  onChange={(e) => setClientCnpj(clientType === 'pj' ? formatCnpjMask(e.target.value) : formatCpfMask(e.target.value))}
+                  placeholder={clientType === 'pj' ? "00.000.000/0000-00" : "000.000.000-00"}
+                  maxLength={clientType === 'pj' ? 18 : 14}
                   className={`w-full rounded-xl border px-4 py-2.5 text-sm font-medium text-white bg-white/5 placeholder-slate-500 outline-none transition ${
-                    cleanCnpjDigits.length === 14 ? 'border-emerald-500/80 focus:border-emerald-400' : 'border-amber-500/80 ring-1 ring-amber-500/20 focus:border-amber-400'
+                    (clientType === 'pj' && cleanCnpjDigits.length === 14) || (clientType === 'pf' && cleanCnpjDigits.length === 11)
+                      ? 'border-emerald-500/80 focus:border-emerald-400' 
+                      : 'border-amber-500/80 ring-1 ring-amber-500/20 focus:border-amber-400'
                   }`}
                 />
-                {cleanCnpjDigits.length < 14 && !isViewing && (
-                  <p className="mt-1 text-[10px] text-amber-400">Preencha o CNPJ completo para destravar o formulário</p>
+                {((clientType === 'pj' && cleanCnpjDigits.length < 14) || (clientType === 'pf' && cleanCnpjDigits.length < 11)) && !isViewing && (
+                  <p className="mt-1 text-[10px] text-amber-400">Preencha o {clientType === 'pj' ? 'CNPJ' : 'CPF'} completo para destravar o formulário</p>
                 )}
               </div>
             ) : (

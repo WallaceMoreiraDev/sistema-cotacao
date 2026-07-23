@@ -29,7 +29,7 @@ export default function LoginPage() {
 
     const formData = new FormData();
     formData.append('email', normalizedEmail);
-    formData.append('password', password);
+    formData.append('password', password.trim()); // Trim the password as well!
 
     try {
       const result = await login(formData);

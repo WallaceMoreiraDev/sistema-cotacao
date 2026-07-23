@@ -16,17 +16,28 @@ export function formatCnpjMask(val: string) {
   return `${digits.slice(0, 2)}.${digits.slice(2, 5)}.${digits.slice(5, 8)}/${digits.slice(8, 12)}-${digits.slice(12)}`;
 }
 
+export function formatCpfMask(val: string) {
+  const digits = val.replace(/\D/g, '').slice(0, 11);
+  if (digits.length <= 3) return digits;
+  if (digits.length <= 6) return `${digits.slice(0, 3)}.${digits.slice(3)}`;
+  if (digits.length <= 9) return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6)}`;
+  return `${digits.slice(0, 3)}.${digits.slice(3, 6)}.${digits.slice(6, 9)}-${digits.slice(9)}`;
+}
+
 export function areItemsMatching(
-  itemA: { name: string; code?: string; productId?: string; measurements?: any },
-  itemB: { name: string; code?: string; productId?: string; measurements?: any }
+  itemA: { name?: string; code?: string; productId?: string; brand?: string; measurements?: any },
+  itemB: { name?: string; code?: string; productId?: string; brand?: string; measurements?: any }
 ): boolean {
-  if (itemA.productId && itemB.productId && itemA.productId === itemB.productId) {
+  if (itemA.productId && itemB.productId && String(itemA.productId) === String(itemB.productId)) {
     return true;
   }
-  if (itemA.name.trim().toLowerCase() !== itemB.name.trim().toLowerCase()) {
+  if (String(itemA.name || '').trim().toLowerCase() !== String(itemB.name || '').trim().toLowerCase()) {
     return false;
   }
-  if (itemA.code && itemB.code && itemA.code.trim().toLowerCase() !== itemB.code.trim().toLowerCase()) {
+  if (itemA.code && itemB.code && String(itemA.code).trim().toLowerCase() !== String(itemB.code).trim().toLowerCase()) {
+    return false;
+  }
+  if (String(itemA.brand || '').trim().toLowerCase() !== String(itemB.brand || '').trim().toLowerCase()) {
     return false;
   }
   const mA = itemA.measurements || {};
@@ -38,6 +49,31 @@ export function areItemsMatching(
     (mA.height1 ?? undefined) === (mB.height1 ?? undefined) &&
     (mA.height2 ?? undefined) === (mB.height2 ?? undefined) &&
     (mA.thickness ?? undefined) === (mB.thickness ?? undefined) &&
-    (mA.cs ?? undefined) === (mB.cs ?? undefined)
+    (mA.crossSection ?? undefined) === (mB.crossSection ?? undefined)
   );
+}
+
+export function countUniqueProtocolItems(items: { name?: string; code?: string; productId?: string; brand?: string; measurements?: any }[] | undefined): number {
+  if (!items || !Array.isArray(items) || items.length === 0) return 0;
+  
+  const uniqueItems: any[] = [];
+  
+  for (let i = 0; i < items.length; i++) {
+    const item = items[i];
+    if (!item) continue;
+    
+    let isDuplicate = false;
+    for (let j = 0; j < uniqueItems.length; j++) {
+      if (areItemsMatching(uniqueItems[j], item)) {
+        isDuplicate = true;
+        break;
+      }
+    }
+    
+    if (!isDuplicate) {
+      uniqueItems.push(item);
+    }
+  }
+  
+  return uniqueItems.length;
 }

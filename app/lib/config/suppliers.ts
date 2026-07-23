@@ -5,9 +5,9 @@ import type { Supplier } from '../types/database';
  * - Original: standard manufacturer/distributor — higher markup (70%)
  * - Local (Mercado Local): emergency/local purchase — lower markup (30%)
  */
-export const SUPPLIERS: Supplier[] = [
-  { id: 'sippel', name: 'Sippel', type: 'original', defaultMarkup: 70 },
-  { id: 'vedpira', name: 'VedPira', type: 'local', defaultMarkup: 30 },
+export const SUPPLIERS = [
+  { id: 'sippel', name: 'Sippel', type: 'Fornecedor Original' as const, defaultMarkup: 70 },
+  { id: 'vedpira', name: 'VedPira', type: 'Mercado Local' as const, defaultMarkup: 30 },
 ];
 
 /**
@@ -20,6 +20,6 @@ export function getSupplierById(id: string): Supplier | undefined {
 /**
  * Returns the default markup based on supplier type.
  */
-export function getDefaultMarkup(supplierType: 'original' | 'local'): number {
-  return supplierType === 'original' ? 70 : 30;
+export function getDefaultMarkup(supplierType: 'Fornecedor Original' | 'Mercado Local'): number {
+  return supplierType === 'Fornecedor Original' ? 70 : 30;
 }

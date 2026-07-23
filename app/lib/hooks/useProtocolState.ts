@@ -3,9 +3,10 @@ import type { ProtocolItem, StockProduct } from '../types/database';
 import { areItemsMatching } from '../utils/protocolFormatters';
 import { ItemFormState, EMPTY_ITEM_FORM } from '../config/protocolForm';
 import { findStockMatch } from '../services/stockService';
-import { getSupplierById, getDefaultMarkup } from '../config/suppliers';
+import { getDefaultMarkup } from '../config/suppliers';
+import type { SupplierRow } from '../actions/suppliers';
 
-export function useProtocolState(initialEstoque: ProtocolItem[] = [], initialACotar: ProtocolItem[] = []) {
+export function useProtocolState(initialEstoque: ProtocolItem[] = [], initialACotar: ProtocolItem[] = [], suppliers: SupplierRow[] = []) {
   const [estoqueItems, setEstoqueItems] = useState<ProtocolItem[]>(initialEstoque);
   const [aCotarItems, setACotarItems] = useState<ProtocolItem[]>(initialACotar);
   const [itemCounter, setItemCounter] = useState(0);
@@ -37,7 +38,7 @@ export function useProtocolState(initialEstoque: ProtocolItem[] = [], initialACo
       cs: parseFloat(itemForm.measurements.cs) || undefined,
     };
 
-    const match = findStockMatch(stockProducts, itemForm.name, measurements);
+    const match = findStockMatch(stockProducts, itemForm.name, measurements, itemForm.brand);
     const identifier = match ? (match.code || match.sku || match.name) : '';
     const availableStock = match ? getFreeStock(identifier, stockProducts) : 0;
 
@@ -59,6 +60,7 @@ export function useProtocolState(initialEstoque: ProtocolItem[] = [], initialACo
         oem: itemForm.oem || match.sku || undefined,
         nickname: itemForm.nickname || undefined,
         code: match.code || itemForm.code || undefined,
+        brand: itemForm.brand || match.brand || undefined,
         measurements,
         stockQty: availableStock,
         productId: match.id,
@@ -87,6 +89,7 @@ export function useProtocolState(initialEstoque: ProtocolItem[] = [], initialACo
           oem: itemForm.oem || undefined,
           nickname: itemForm.nickname || undefined,
           code: itemForm.code || undefined,
+          brand: itemForm.brand || undefined,
           measurements,
           supplierPrices: {},
           markupPercent: undefined,
@@ -117,6 +120,7 @@ export function useProtocolState(initialEstoque: ProtocolItem[] = [], initialACo
         oem: itemForm.oem || undefined,
         nickname: itemForm.nickname || undefined,
         code: itemForm.code || undefined,
+        brand: itemForm.brand || undefined,
         measurements,
         supplierPrices: {},
         markupPercent: undefined,
@@ -139,12 +143,16 @@ export function useProtocolState(initialEstoque: ProtocolItem[] = [], initialACo
     setTimeout(() => setAddFeedback(null), 4000);
   }, [itemForm, itemCounter, getFreeStock]);
 
-  const handleReallocate = useCallback((id: string, maxQty: number) => {
+  const handleReallocate = useCallback((id: string, maxQty: number, stockProducts: StockProduct[]) => {
     const targetItem = aCotarItems.find(i => i.id === id);
     if (!targetItem) return;
 
     const currentQty = Number(targetItem.quantity);
     const qtyToMove = Math.min(currentQty, maxQty);
+
+    const identifier = targetItem.code || targetItem.oem || targetItem.name;
+    const product = stockProducts.find(p => (p.code || p.sku || p.name) === identifier);
+    const costPrice = product ? product.costPrice : 0;
 
     const newEstoqueItem: ProtocolItem = {
       ...targetItem,
@@ -155,9 +163,9 @@ export function useProtocolState(initialEstoque: ProtocolItem[] = [], initialACo
       chosenSupplier: undefined,
       chosenSupplierType: undefined,
       markupPercent: 70,
-      costPrice: 0,
-      unitPrice: 0,
-      salePrice: 0,
+      costPrice: costPrice,
+      unitPrice: costPrice,
+      salePrice: costPrice * 1.7,
       needsApproval: false,
     };
 
@@ -219,7 +227,7 @@ export function useProtocolState(initialEstoque: ProtocolItem[] = [], initialACo
       return [...cotarPrev, quotedItem];
     });
 
-    setEstoqueItems(prev => prev.map(i => (i.id === id ? { ...i, quantity: maxStock } : i)));
+    setEstoqueItems(prev => prev.map(i => (i.id === id ? { ...i, quantity: maxStock } : i)).filter(i => i.quantity > 0));
   }, [estoqueItems]);
 
   const splitMultipleEstoqueItems = useCallback((splits: { id: string; maxStock: number; excessQty: number }[]) => {
@@ -265,7 +273,7 @@ export function useProtocolState(initialEstoque: ProtocolItem[] = [], initialACo
       return prev.map(i => {
         const split = splits.find(s => s.id === i.id);
         return split ? { ...i, quantity: split.maxStock } : i;
-      });
+      }).filter(i => i.quantity > 0);
     });
   }, [estoqueItems]);
 
@@ -286,30 +294,43 @@ export function useProtocolState(initialEstoque: ProtocolItem[] = [], initialACo
         const newPrices = { ...item.supplierPrices, [supplierId]: numVal };
         const filledSuppliers = Object.entries(newPrices).filter(([, price]) => price > 0);
         let chosen: string | undefined;
-        let chosenType: 'original' | 'local' | undefined;
+        let chosenType: 'Mercado Local' | 'Fornecedor Original' | undefined;
         let lowestPrice = Infinity;
         for (const [sid, price] of filledSuppliers) {
           if (price < lowestPrice) {
             lowestPrice = price;
             chosen = sid;
-            const supplier = getSupplierById(sid);
+            const supplier = suppliers.find(s => s.id === sid);
             chosenType = supplier?.type;
           }
         }
         const defaultMk = chosenType ? getDefaultMarkup(chosenType) : undefined;
-        const currentMarkup = item.markupPercent ?? defaultMk;
+        
+        let currentMarkup = item.markupPercent;
+        if (item.needsApproval === false && defaultMk !== undefined) {
+          currentMarkup = defaultMk;
+        } else if (currentMarkup === undefined) {
+          currentMarkup = defaultMk;
+        }
+
         const finalMarkup = currentMarkup ?? 0;
         const salePrice = lowestPrice === Infinity ? 0 : lowestPrice * (1 + finalMarkup / 100);
         const needsApproval = defaultMk !== undefined && currentMarkup !== undefined && currentMarkup !== defaultMk;
+
+        let approvalStatus = item.approvalStatus;
+        if (currentMarkup !== item.markupPercent) {
+          approvalStatus = 'pending';
+        }
 
         return {
           ...item,
           supplierPrices: newPrices,
           chosenSupplier: chosen,
           chosenSupplierType: chosenType,
-          markupPercent: currentMarkup ?? defaultMk,
+          markupPercent: currentMarkup,
           salePrice,
           needsApproval,
+          approvalStatus,
           unitPrice: lowestPrice === Infinity ? 0 : lowestPrice,
         };
       })
@@ -326,8 +347,13 @@ export function useProtocolState(initialEstoque: ProtocolItem[] = [], initialACo
         const needsApproval = numVal !== defaultMk;
         const basePrice = item.unitPrice ?? 0;
         const salePrice = basePrice * (1 + numVal / 100);
+        
+        let approvalStatus = item.approvalStatus;
+        if (numVal !== item.markupPercent) {
+          approvalStatus = 'pending';
+        }
 
-        return { ...item, markupPercent: numVal, salePrice, needsApproval };
+        return { ...item, markupPercent: numVal, salePrice, needsApproval, approvalStatus };
       })
     );
   }, []);
