@@ -17,6 +17,9 @@ export default function AdminAprovacoesPage() {
   
   // Custom Markups
   const [customMarkups, setCustomMarkups] = useState<Record<string, string>>({});
+  
+  // Reject Modal State
+  const [itemToReject, setItemToReject] = useState<any | null>(null);
 
   const loadApprovals = async () => {
     setLoading(true);
@@ -46,6 +49,7 @@ export default function AdminAprovacoesPage() {
     
     const res = await rejectItemAction(item.id, defaultMk, basePrice);
     if (res.success) {
+      setItemToReject(null);
       loadApprovals();
     } else {
       alert('Erro ao rejeitar item');
@@ -239,11 +243,7 @@ export default function AdminAprovacoesPage() {
                           </div>
                           
                           <button
-                            onClick={() => {
-                              if (confirm('Tem certeza que deseja rejeitar este markup? O item voltará ao markup padrão.')) {
-                                handleReject(item);
-                              }
-                            }}
+                            onClick={() => setItemToReject(item)}
                             className="w-full inline-flex justify-center items-center gap-1.5 rounded-lg border border-red-200 bg-red-50 px-3 py-1.5 text-xs font-bold text-red-700 shadow-sm hover:bg-red-100 hover:text-red-800 transition"
                           >
                             <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -261,6 +261,42 @@ export default function AdminAprovacoesPage() {
           </div>
         )}
       </div>
+
+      {/* Modal de Rejeição */}
+      {itemToReject && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl p-6 shadow-xl w-full max-w-sm border border-slate-200 animate-in fade-in zoom-in duration-200">
+            <div className="flex flex-col items-center text-center gap-4">
+              <div className="w-12 h-12 rounded-full bg-red-100 flex items-center justify-center text-red-600">
+                <svg className="w-6 h-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                </svg>
+              </div>
+              <div>
+                <h3 className="text-lg font-bold text-slate-900">Rejeitar Markup?</h3>
+                <p className="text-sm text-slate-500 mt-1">
+                  Tem certeza que deseja rejeitar este markup? O item voltará ao markup padrão.
+                </p>
+              </div>
+            </div>
+            
+            <div className="mt-6 flex gap-3 w-full">
+              <button
+                onClick={() => setItemToReject(null)}
+                className="flex-1 rounded-xl px-4 py-2 text-sm font-bold text-slate-700 bg-slate-100 hover:bg-slate-200 transition"
+              >
+                Cancelar
+              </button>
+              <button
+                onClick={() => handleReject(itemToReject)}
+                className="flex-1 rounded-xl px-4 py-2 text-sm font-bold text-white bg-red-600 hover:bg-red-700 transition"
+              >
+                Rejeitar
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
