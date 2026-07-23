@@ -307,9 +307,9 @@ export function useProtocolState(initialEstoque: ProtocolItem[] = [], initialACo
         const defaultMk = chosenType ? getDefaultMarkup(chosenType) : undefined;
         
         let currentMarkup = item.markupPercent;
-        if (item.needsApproval === false && defaultMk !== undefined) {
-          currentMarkup = defaultMk;
-        } else if (currentMarkup === undefined) {
+        
+        // Se o fornecedor vencedor mudou, ou se não tinha markup antes, volta pro padrão do vencedor
+        if (chosen !== item.chosenSupplier || currentMarkup === undefined || currentMarkup === null) {
           currentMarkup = defaultMk;
         }
 

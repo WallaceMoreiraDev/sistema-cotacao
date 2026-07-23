@@ -151,7 +151,7 @@ export function TabelaCotacao({
                     {item.chosenSupplier ? (
                       <div className="flex items-center gap-1.5 px-2.5 py-1 bg-emerald-100 text-emerald-800 rounded-lg text-xs font-bold border border-emerald-200">
                         <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                        {suppliers.find(s => s.id === item.chosenSupplier)?.name || item.chosenSupplier}
+                        Fornecedor Escolhido: {suppliers.find(s => s.id === item.chosenSupplier)?.name || item.chosenSupplier}
                       </div>
                     ) : (
                       <div className="text-[11px] text-slate-400 font-medium italic">Nenhum custo informado</div>
@@ -169,20 +169,27 @@ export function TabelaCotacao({
                   </div>
 
                   {/* Right: Financeiro */}
-                  <div className="flex items-center gap-6">
+                  <div className="flex flex-col md:flex-row items-end md:items-center gap-4 md:gap-6">
                     <div className="flex items-center gap-2">
-                      <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Markup %</label>
+                      <div className="flex flex-col items-end gap-1">
+                        <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Markup %</label>
+                        {item.needsApproval && (
+                          <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${isApproved ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
+                            {isApproved ? '✅ Aprovado' : '⚠️ Requer Aprovação'}
+                          </span>
+                        )}
+                      </div>
                       <div className="relative group">
                         <input
                           type="number"
                           value={item.markupPercent ?? ''}
                           onChange={(e) => updateItemMarkup(item.id, e.target.value)}
                           disabled={disableMarkup}
-                          className={`w-16 rounded border py-1.5 px-2 text-sm text-center font-bold text-slate-900 ${
+                          className={`w-16 h-10 rounded border py-1.5 px-2 text-sm text-center font-bold text-slate-900 ${
                             item.needsApproval
                               ? isApproved
                                 ? 'border-emerald-300 bg-emerald-50 text-emerald-800 focus:ring-emerald-500 cursor-not-allowed'
-                                : 'border-amber-300 bg-amber-50 text-amber-800 focus:ring-amber-500'
+                                : 'border-amber-400 bg-amber-50 text-amber-900 focus:ring-amber-500'
                               : 'border-slate-300 focus:border-emerald-500 focus:ring-emerald-500'
                           } ${disableMarkup ? 'opacity-80' : ''}`}
                         />
