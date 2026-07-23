@@ -335,7 +335,7 @@ export function useProtocolState(initialEstoque: ProtocolItem[] = [], initialACo
         };
       })
     );
-  }, []);
+  }, [suppliers]);
 
   const updateItemMarkup = useCallback((itemId: string, value: string) => {
     const numVal = parseFloat(value) || 0;
