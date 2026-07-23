@@ -220,6 +220,12 @@ export async function saveProtocolAction(protocol: Protocol): Promise<{ success:
 
     console.log('[saveProtocol] Protocol saved with id:', actualId);
 
+    // Fetch existing items to preserve approval state if not explicitly dirtied on the frontend
+    const { data: existingItems } = await supabase
+      .from('protocol_items')
+      .select('id, markup_percent, sale_price, needs_approval, approval_status')
+      .eq('protocol_id', actualId);
+
     // 2. Delete existing items for this protocol to replace cleanly
     const { error: deleteError } = await supabase.from('protocol_items').delete().eq('protocol_id', actualId);
     if (deleteError) {
@@ -231,9 +237,26 @@ export async function saveProtocolAction(protocol: Protocol): Promise<{ success:
       const itemsToInsert = protocol.items.map((item) => {
         // Only generate a new UUID if it's a temporary client-side ID (starts with 'item-')
         const isTempItemId = String(item.id).startsWith('item-');
+        const itemId = isTempItemId ? crypto.randomUUID() : item.id;
+
+        let finalMarkup = item.markupPercent ?? null;
+        let finalSalePrice = item.salePrice ?? 0;
+        let finalNeedsApproval = item.needsApproval ?? false;
+        let finalApprovalStatus = item.approvalStatus || 'pending';
+
+        if (!isTempItemId && !item.isMarkupDirty && existingItems) {
+          const dbItem = existingItems.find(e => e.id === itemId);
+          if (dbItem) {
+            finalMarkup = dbItem.markup_percent;
+            finalSalePrice = dbItem.sale_price;
+            finalNeedsApproval = dbItem.needs_approval;
+            finalApprovalStatus = dbItem.approval_status;
+          }
+        }
+
         return {
           protocol_id: actualId,
-          id: isTempItemId ? crypto.randomUUID() : item.id,
+          id: itemId,
           name: item.name,
           quantity: item.quantity,
           unit_price: item.unitPrice ?? 0,
@@ -248,10 +271,10 @@ export async function saveProtocolAction(protocol: Protocol): Promise<{ success:
           supplier_prices: item.supplierPrices || {},
           chosen_supplier: item.chosenSupplier || null,
           chosen_supplier_type: item.chosenSupplierType || null,
-          markup_percent: item.markupPercent ?? null,
-          sale_price: item.salePrice ?? 0,
-          needs_approval: item.needsApproval ?? false,
-          approval_status: item.approvalStatus || 'pending',
+          markup_percent: finalMarkup,
+          sale_price: finalSalePrice,
+          needs_approval: finalNeedsApproval,
+          approval_status: finalApprovalStatus,
         };
       });
 

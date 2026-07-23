@@ -331,6 +331,7 @@ export function useProtocolState(initialEstoque: ProtocolItem[] = [], initialACo
           salePrice,
           needsApproval,
           approvalStatus,
+          isMarkupDirty: true,
           unitPrice: lowestPrice === Infinity ? 0 : lowestPrice,
         };
       })
@@ -353,7 +354,7 @@ export function useProtocolState(initialEstoque: ProtocolItem[] = [], initialACo
           approvalStatus = 'pending';
         }
 
-        return { ...item, markupPercent: numVal, salePrice, needsApproval, approvalStatus };
+        return { ...item, markupPercent: numVal, salePrice, needsApproval, approvalStatus, isMarkupDirty: true };
       })
     );
   }, []);
