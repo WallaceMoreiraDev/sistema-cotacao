@@ -58,8 +58,10 @@ export function TabelaCotacao({
             const freeStock = getFreeStock(item.code || item.oem || item.name);
             const canReallocate = freeStock > 0;
             const isApproved = item.approvalStatus === 'approved';
+            const isRejected = item.approvalStatus === 'rejected';
+            const isLocked = isApproved || isRejected;
             const isUnlocked = unlockedItems.has(item.id);
-            const disableMarkup = (isApproved && !isUnlocked) || isViewing;
+            const disableMarkup = isViewing || (!isUnlocked && isLocked);
 
             return (
               <div key={item.id} className="flex flex-col rounded-xl border border-slate-200 bg-white overflow-hidden shadow-sm transition-shadow hover:shadow-md">
@@ -173,9 +175,9 @@ export function TabelaCotacao({
                     <div className="flex items-center gap-2">
                       <div className="flex flex-col items-end gap-1">
                         <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Markup %</label>
-                        {item.needsApproval && (
-                          <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${isApproved ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'}`}>
-                            {isApproved ? '✅ Aprovado' : '⚠️ Requer Aprovação'}
+                        {(item.needsApproval || isRejected) && (
+                          <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${isApproved ? 'bg-emerald-100 text-emerald-700' : isRejected ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>
+                            {isApproved ? '✅ Aprovado' : isRejected ? '❌ Rejeitado' : '⚠️ Requer Aprovação'}
                           </span>
                         )}
                       </div>
@@ -186,19 +188,21 @@ export function TabelaCotacao({
                           onChange={(e) => updateItemMarkup(item.id, e.target.value)}
                           disabled={disableMarkup}
                           className={`w-16 h-10 rounded border py-1.5 px-2 text-sm text-center font-bold text-slate-900 ${
-                            item.needsApproval
+                            (item.needsApproval || isRejected)
                               ? isApproved
                                 ? 'border-emerald-300 bg-emerald-50 text-emerald-800 focus:ring-emerald-500 cursor-not-allowed'
+                                : isRejected
+                                ? 'border-red-300 bg-red-50 text-red-800 focus:ring-red-500 cursor-not-allowed'
                                 : 'border-amber-400 bg-amber-50 text-amber-900 focus:ring-amber-500'
                               : 'border-slate-300 focus:border-emerald-500 focus:ring-emerald-500'
                           } ${disableMarkup ? 'opacity-80' : ''}`}
                         />
-                        {isApproved && !isUnlocked && !isViewing && (
+                        {isLocked && !isUnlocked && !isViewing && (
                           <button
                             type="button"
                             onClick={() => handleUnlock(item.id)}
-                            className="absolute -right-2 -top-2 bg-emerald-500 text-white rounded-full p-0.5 hover:bg-emerald-600 transition-colors shadow-sm z-10 cursor-pointer"
-                            title="Desbloquear Markup (Markup foi aprovado pelo Admin)"
+                            className={`absolute -right-2 -top-2 text-white rounded-full p-0.5 transition-colors shadow-sm z-10 cursor-pointer ${isApproved ? 'bg-emerald-500 hover:bg-emerald-600' : 'bg-red-500 hover:bg-red-600'}`}
+                            title={isApproved ? "Desbloquear Markup (Aprovado)" : "Desbloquear Markup (Rejeitado)"}
                           >
                             <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
                           </button>
