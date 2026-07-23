@@ -81,7 +81,7 @@ export default function ProtocolDetailPage() {
     updateMeasurement,
   } = useProtocolState([], [], suppliers);
 
-  const allItems = [...estoqueItems, ...aCotarItems];
+  const allItems = useMemo(() => [...estoqueItems, ...aCotarItems], [estoqueItems, aCotarItems]);
 
   // ── Load Protocol by ID ──
   useEffect(() => {
@@ -153,14 +153,24 @@ export default function ProtocolDetailPage() {
   const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const isDirtyRef = useRef(false);
+
+  useEffect(() => {
+    if (!isProtocolLoading && !isViewing) {
+      isDirtyRef.current = true;
+    }
+  }, [allItems, clientName, clientCnpj, isNewClient, protocolTitle, itemForm]);
+
   useEffect(() => {
     if (isViewing || isFinalizing) return;
     if (isFinalizingRef.current) return;
     if (allItems.length === 0 && !clientName.trim()) return;
+    if (!isDirtyRef.current) return;
 
     if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
 
     autoSaveTimer.current = setTimeout(async () => {
+      isDirtyRef.current = false;
       setAutoSaveStatus('saving');
       
       const totalsObj = calculateTotals(allItems);
