@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useRouter, useParams } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createProtocol, calculateTotals } from '../../../lib/services/protocolService';
-import { saveProtocolAction, getProtocolByIdAction, reservarEstoqueAction, enviarParaBlingAction, cancelarCotacaoAction, estornarCotacaoAction, restaurarCotacaoAction } from '../../../lib/actions/protocols';
+import { saveProtocolAction, getProtocolByIdAction, reservarEstoqueAction, enviarParaBlingAction, cancelarCotacaoAction, estornarCotacaoAction, restaurarCotacaoAction, insertLogAction } from '../../../lib/actions/protocols';
 import { createClientAction } from '../../../lib/actions/clients';
 import type { Protocol, ProtocolItem } from '../../../lib/types/database';
 import { ItemFormState } from '../../../lib/config/protocolForm';
@@ -79,6 +79,7 @@ export default function ProtocolDetailPage() {
     updateItemMarkup,
     updateItemField,
     updateMeasurement,
+    clearItemForm,
   } = useProtocolState([], [], suppliers);
 
   const allItems = useMemo(() => [...estoqueItems, ...aCotarItems], [estoqueItems, aCotarItems]);
@@ -152,6 +153,21 @@ export default function ProtocolDetailPage() {
   // ── Auto-save ──
   const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  
+  const saveQueueRef = useRef<Promise<any>>(Promise.resolve());
+
+  const queueSaveProtocol = useCallback((protocol: any, options?: { skipDiffLog?: boolean }) => {
+    return new Promise<{ success: boolean; data?: any; error?: string }>((resolve, reject) => {
+      saveQueueRef.current = saveQueueRef.current.then(async () => {
+        try {
+          const res = await saveProtocolAction(protocol, options);
+          resolve(res);
+        } catch (e) {
+          reject(e);
+        }
+      });
+    });
+  }, []);
 
   const isDirtyRef = useRef(false);
 
@@ -186,7 +202,7 @@ export default function ProtocolDetailPage() {
         draftForm: itemForm,
       });
 
-      const res = await saveProtocolAction(protocol);
+      const res = await queueSaveProtocol(protocol);
       if (res.success && res.data) {
         protocolIdRef.current = res.data.id;
       }
@@ -229,12 +245,13 @@ export default function ProtocolDetailPage() {
     const excess = requestedQty - maxStock;
     
     splitEstoqueItem(item.id, maxStock, excess);
+    
     setSplitModalState(prev => ({ ...prev, isOpen: false }));
   }, [splitModalState, splitEstoqueItem]);
 
   const canFinalize = allItems.length > 0 && clientName.trim().length > 0;
 
-  const handleSaveDraft = useCallback(async (forcedEstoque?: ProtocolItem[], forcedACotar?: ProtocolItem[]) => {
+  const handleSaveDraft = useCallback(async (forcedEstoque?: ProtocolItem[], forcedACotar?: ProtocolItem[], options?: { skipDiffLog?: boolean }) => {
     if (!canFinalize) return;
     setIsFinalizing(true);
     isFinalizingRef.current = true;
@@ -259,7 +276,7 @@ export default function ProtocolDetailPage() {
         draftForm: itemForm,
       });
 
-      await saveProtocolAction(protocol);
+      await queueSaveProtocol(protocol, options);
       toast.success('Alterações salvas com sucesso!');
       setIsViewing(true);
     } catch (error) {
@@ -271,12 +288,12 @@ export default function ProtocolDetailPage() {
     }
   }, [canFinalize, clientName, clientCnpj, isNewClient, protocolTitle, estoqueItems, aCotarItems, itemForm, protocolStatus]);
 
-  const handleReservarEstoque = useCallback(async (forcedEstoque?: ProtocolItem[], forcedACotar?: ProtocolItem[]) => {
+  const handleReservarEstoque = useCallback(async (forcedEstoque?: ProtocolItem[], forcedACotar?: ProtocolItem[], options?: { skipDiffLog?: boolean }) => {
     if (!canFinalize) return;
     setIsFinalizing(true);
     
     try {
-      await handleSaveDraft(forcedEstoque, forcedACotar); // force save before transitioning
+      await handleSaveDraft(forcedEstoque, forcedACotar, options); // force save before transitioning
       const res = await reservarEstoqueAction(protocolIdRef.current);
       if (res.success) {
         toast.success('Estoque reservado com sucesso!');
@@ -292,10 +309,10 @@ export default function ProtocolDetailPage() {
     }
   }, [canFinalize, handleSaveDraft]);
 
-  const handleEnviarBling = useCallback(async (forcedEstoque?: ProtocolItem[], forcedACotar?: ProtocolItem[]) => {
+  const handleEnviarBling = useCallback(async (forcedEstoque?: ProtocolItem[], forcedACotar?: ProtocolItem[], options?: { skipDiffLog?: boolean }) => {
     setIsFinalizing(true);
     try {
-      await handleSaveDraft(forcedEstoque, forcedACotar);
+      await handleSaveDraft(forcedEstoque, forcedACotar, options);
       const res = await enviarParaBlingAction(protocolIdRef.current);
       if (res.success) {
         toast.success('Enviado para o Bling com sucesso!');
@@ -416,9 +433,14 @@ export default function ProtocolDetailPage() {
     }).filter(i => i.quantity > 0);
     
     let updatedACotar = [...aCotarItems];
+    let summaryLog = '';
+    
     for (const split of splits) {
       const item = estoqueItems.find(i => i.id === split.id);
       if (!item) continue;
+      
+      summaryLog += `\n- ${item.name}: mantidos ${split.maxStock} un. no estoque, enviados ${split.excessQty} un. para cotação.`;
+      
       const quotedItem: ProtocolItem = {
         ...item,
         id: `item-${Date.now()}-${Math.random().toString(36).substring(2, 9)}-c`,
@@ -444,8 +466,8 @@ export default function ProtocolDetailPage() {
         updatedACotar.push(quotedItem);
       }
     }
-
-      setEstoqueItems(updatedEstoque);
+    
+    setEstoqueItems(updatedEstoque);
     setACotarItems(updatedACotar);
     setShowDeficitModal(false);
 
@@ -461,6 +483,7 @@ export default function ProtocolDetailPage() {
   const handleConfirmRealloc = useCallback(async () => {
     const updatedEstoque = [...estoqueItems];
     let updatedACotar = [...aCotarItems];
+    let summaryLog = '';
 
     for (const { item, freeStock } of reallocatableItems) {
       const targetItem = updatedACotar.find(i => i.id === item.id);
@@ -468,6 +491,8 @@ export default function ProtocolDetailPage() {
 
       const currentQty = Number(targetItem.quantity);
       const qtyToMove = Math.min(currentQty, freeStock);
+      
+      summaryLog += `\n- ${item.name}: ${qtyToMove} un. transferidas de Cotação para Estoque.`;
 
       const identifier = item.code || item.oem || item.name;
       const product = stockProducts.find(p => (p.code || p.sku || p.name) === identifier);
@@ -504,7 +529,7 @@ export default function ProtocolDetailPage() {
         updatedACotar = updatedACotar.map(i => (i.id === item.id ? { ...i, quantity: currentQty - qtyToMove } : i));
       }
     }
-
+    
     setEstoqueItems(updatedEstoque);
     setACotarItems(updatedACotar);
     setShowReallocModal(false);
@@ -599,6 +624,7 @@ export default function ProtocolDetailPage() {
         getFreeStock={getFreeStock}
         isViewing={isViewing}
         sealTypesLoading={sealTypesLoading}
+        onClearForm={clearItemForm}
       />
 
       <TabelaEstoque

@@ -20,6 +20,7 @@ interface FormularioAdicaoItemProps {
   getFreeStock: (identifier: string, stockProducts: StockProduct[]) => number;
   isViewing?: boolean;
   sealTypesLoading?: boolean;
+  onClearForm: () => void;
 }
 
 export function FormularioAdicaoItem({
@@ -38,6 +39,7 @@ export function FormularioAdicaoItem({
   getFreeStock,
   isViewing = false,
   sealTypesLoading = false,
+  onClearForm,
 }: FormularioAdicaoItemProps) {
   const [isSealDropdownOpen, setIsSealDropdownOpen] = useState(false);
   const [stockSearchQuery, setStockSearchQuery] = useState('');
@@ -98,7 +100,18 @@ export function FormularioAdicaoItem({
             {/* Form */}
             <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm space-y-4">
               <div className="flex items-center justify-between">
-                <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider">Adicionar Item</h2>
+                <div className="flex items-center gap-3">
+                  <h2 className="text-sm font-bold text-slate-900 uppercase tracking-wider">Adicionar Item</h2>
+                  {(itemForm.name || itemForm.brand || itemForm.oem || Object.keys(itemForm.measurements).length > 0) && (
+                    <button
+                      type="button"
+                      onClick={onClearForm}
+                      className="text-[10px] bg-slate-100 px-2 py-1 rounded text-slate-600 hover:bg-slate-200 hover:text-slate-800 font-bold uppercase transition"
+                    >
+                      Limpar
+                    </button>
+                  )}
+                </div>
                 <span className="rounded-full bg-slate-100 px-2.5 py-0.5 text-[10px] font-bold text-slate-500">
                   {allItemsCount} {allItemsCount === 1 ? 'item' : 'itens'} adicionados
                 </span>

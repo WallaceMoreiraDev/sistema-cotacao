@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { createProtocol, calculateTotals } from '../../../lib/services/protocolService';
 import { areItemsMatching, countUniqueProtocolItems } from '../../../lib/utils/protocolFormatters';
-import { saveProtocolAction, cancelarCotacaoAction } from '../../../lib/actions/protocols';
+import { saveProtocolAction, cancelarCotacaoAction, reservarEstoqueAction } from '../../../lib/actions/protocols';
 import { createClientAction } from '../../../lib/actions/clients';
 import type { ProtocolItem } from '../../../lib/types/database';
 
@@ -73,6 +73,7 @@ export default function NewProtocolPage() {
     updateItemMarkup,
     updateItemField,
     updateMeasurement,
+    clearItemForm,
   } = useProtocolState([], [], suppliers);
 
   const allItems = [...estoqueItems, ...aCotarItems];
@@ -103,6 +104,23 @@ export default function NewProtocolPage() {
   const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
+  const saveQueueRef = useRef<Promise<any>>(Promise.resolve());
+
+  const queueSaveProtocol = useCallback((protocol: any, options?: { skipDiffLog?: boolean }) => {
+    return new Promise<{ success: boolean; data?: any; error?: string }>((resolve, reject) => {
+      saveQueueRef.current = saveQueueRef.current.then(async () => {
+        try {
+          // Garante que se um save anterior na fila já criou o ID real, os próximos usem ele.
+          const protocolToSave = { ...protocol, id: protocolIdRef.current };
+          const res = await saveProtocolAction(protocolToSave, options);
+          resolve(res);
+        } catch (e) {
+          reject(e);
+        }
+      });
+    });
+  }, []);
+
   useEffect(() => {
     if (isFinalizing || isFinalizingRef.current) return;
     if (allItems.length === 0 && !clientName.trim()) return;
@@ -124,7 +142,7 @@ export default function NewProtocolPage() {
         status: 'nao_reservado',
       });
 
-      const res = await saveProtocolAction(protocol);
+      const res = await queueSaveProtocol(protocol);
       if (res.success && res.data) {
         protocolIdRef.current = res.data.id;
       }
@@ -197,7 +215,7 @@ export default function NewProtocolPage() {
         draftForm: itemForm,
       });
 
-      await saveProtocolAction(protocol);
+      await queueSaveProtocol(protocol);
       toast.success('Rascunho salvo com sucesso!');
       router.push(`/protocolo/${protocolIdRef.current}`);
     } catch (error) {
@@ -233,9 +251,16 @@ export default function NewProtocolPage() {
         status: 'nao_reservado',
       });
 
-      await saveProtocolAction(protocol);
-      toast.success('Cotação efetivada com sucesso!');
-      router.push(`/protocolo/${protocolIdRef.current}`);
+      await queueSaveProtocol(protocol);
+      
+      const res = await reservarEstoqueAction(protocolIdRef.current);
+      if (res.success) {
+        toast.success('Estoque reservado com sucesso!');
+        router.push(`/protocolo/${protocolIdRef.current}`);
+      } else {
+        toast.error(res.error || 'Erro ao reservar estoque. O rascunho foi salvo.');
+        router.push(`/protocolo/${protocolIdRef.current}`);
+      }
     } catch (error) {
       console.error(error);
       toast.error('Erro ao efetivar cotação.');
@@ -451,6 +476,7 @@ export default function NewProtocolPage() {
         allItemsCount={allItems.length}
         getFreeStock={getFreeStock}
         sealTypesLoading={sealTypesLoading}
+        onClearForm={clearItemForm}
       />
 
       <TabelaEstoque

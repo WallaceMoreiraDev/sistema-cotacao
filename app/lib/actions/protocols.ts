@@ -145,7 +145,7 @@ export async function getProtocolByIdAction(id: string): Promise<{ success: bool
 /**
  * Save/Insert/Upsert a protocol and its items in Supabase
  */
-export async function saveProtocolAction(protocol: Protocol): Promise<{ success: boolean; data?: Protocol; error?: string }> {
+export async function saveProtocolAction(protocol: Protocol, options?: { skipDiffLog?: boolean }): Promise<{ success: boolean; data?: Protocol; error?: string }> {
   try {
     const supabase = await createClient();
 
@@ -203,6 +203,12 @@ export async function saveProtocolAction(protocol: Protocol): Promise<{ success:
       }
     }
 
+    let oldProtocolName = null;
+    if (!isTempId) {
+      const { data: oldData } = await supabase.from('protocols').select('client_name').eq('id', Number(protocol.id)).single();
+      if (oldData) oldProtocolName = oldData.client_name;
+    }
+
     // 1. Upsert Protocol
     const { data: protoRow, error: protoError } = await supabase
       .from('protocols')
@@ -220,10 +226,10 @@ export async function saveProtocolAction(protocol: Protocol): Promise<{ success:
 
     console.log('[saveProtocol] Protocol saved with id:', actualId);
 
-    // Fetch existing items to preserve approval state if not explicitly dirtied on the frontend
+    // Fetch existing items to preserve approval state and for diffing
     const { data: existingItems } = await supabase
       .from('protocol_items')
-      .select('id, markup_percent, sale_price, needs_approval, approval_status')
+      .select('*')
       .eq('protocol_id', actualId);
 
     // 2. Delete existing items for this protocol to replace cleanly
@@ -288,6 +294,139 @@ export async function saveProtocolAction(protocol: Protocol): Promise<{ success:
       }
 
       console.log('[saveProtocol] Items inserted successfully:', insertedItems?.length ?? 0);
+    }
+    
+    // 4. Smart Diffing for Auto-Save Logging
+    if (isTempId) {
+      await insertLogAction(actualId, 'protocol_created', `Protocolo criado para o cliente ${protocol.clientName}.`);
+    } else {
+      let diffLogs = [];
+      
+      if (oldProtocolName && oldProtocolName !== protocol.clientName) {
+        diffLogs.push(`Cliente alterado de "${oldProtocolName}" para "${protocol.clientName}".`);
+      }
+      
+      const newItems = protocol.items || [];
+      const oldItems = existingItems || [];
+      
+      // Group items by a base semantic key (ignoring 'type' which distinguishes Estoque/A Cotar)
+      
+      const buildItemDetailsString = (item: any) => {
+        let details = [];
+        if (item.code) details.push(`Cód: ${item.code}`);
+        if (item.brand) details.push(`Marca: ${item.brand}`);
+        if (item.measurements) {
+          const m = item.measurements;
+          const mParts = [];
+          if (m.innerDiameter) mParts.push(`DI:${m.innerDiameter}`);
+          if (m.outerDiameter) mParts.push(`DE:${m.outerDiameter}`);
+          if (m.height1) mParts.push(`H1:${m.height1}`);
+          if (m.height2) mParts.push(`H2:${m.height2}`);
+          if (m.thickness) mParts.push(`Esp:${m.thickness}`);
+          if (m.cs) mParts.push(`CS:${m.cs}`);
+          if (mParts.length > 0) details.push(`Med: ${mParts.join('x')}`);
+        }
+        return details.length > 0 ? `${item.name} [${details.join(' | ')}]` : item.name;
+      };
+
+      const getBaseSemanticKey = (item: any) => {
+        return buildItemDetailsString(item).toLowerCase();
+      };
+
+      type ItemStats = { name: string, estoque: number, a_cotar: number };
+      const oldMap = new Map<string, ItemStats>();
+      const newMap = new Map<string, ItemStats>();
+
+      for (const item of oldItems) {
+        const key = getBaseSemanticKey(item);
+        if (!oldMap.has(key)) oldMap.set(key, { name: buildItemDetailsString(item), estoque: 0, a_cotar: 0 });
+        const stats = oldMap.get(key)!;
+        if (item.type === 'a_cotar') stats.a_cotar += Number(item.quantity);
+        else stats.estoque += Number(item.quantity);
+      }
+
+      for (const item of newItems) {
+        const key = getBaseSemanticKey(item);
+        if (!newMap.has(key)) newMap.set(key, { name: buildItemDetailsString(item), estoque: 0, a_cotar: 0 });
+        const stats = newMap.get(key)!;
+        if (item.type === 'a_cotar') stats.a_cotar += Number(item.quantity);
+        else stats.estoque += Number(item.quantity);
+      }
+
+      const allKeys = new Set([...oldMap.keys(), ...newMap.keys()]);
+
+      for (const key of allKeys) {
+        const oldStats = oldMap.get(key) || { name: '', estoque: 0, a_cotar: 0 };
+        const newStats = newMap.get(key) || { name: '', estoque: 0, a_cotar: 0 };
+        
+        const oldTotal = oldStats.estoque + oldStats.a_cotar;
+        const newTotal = newStats.estoque + newStats.a_cotar;
+        
+        const deltaEstoque = newStats.estoque - oldStats.estoque;
+        const deltaCotar = newStats.a_cotar - oldStats.a_cotar;
+        
+        const itemName = newStats.name || oldStats.name;
+
+        if (oldTotal === 0 && newTotal > 0) {
+          // Pure addition
+          if (newStats.estoque > 0 && newStats.a_cotar > 0) {
+             diffLogs.push(`Item adicionado e fracionado: "${itemName}" (${newStats.estoque} un. em Estoque + ${newStats.a_cotar} un. A Cotar)`);
+          } else if (newStats.estoque > 0) {
+             diffLogs.push(`Item adicionado (Estoque): "${itemName}" (${newStats.estoque} un.)`);
+          } else {
+             diffLogs.push(`Item adicionado (A Cotar): "${itemName}" (${newStats.a_cotar} un.)`);
+          }
+        } else if (oldTotal > 0 && newTotal === 0) {
+          // Pure removal
+          if (oldStats.estoque > 0 && oldStats.a_cotar > 0) {
+            diffLogs.push(`Item totalmente removido: "${itemName}" (removido do Estoque e de A Cotar)`);
+          } else if (oldStats.estoque > 0) {
+            diffLogs.push(`Item removido (Estoque): "${itemName}"`);
+          } else {
+            diffLogs.push(`Item removido (A Cotar): "${itemName}"`);
+          }
+        } else if (oldTotal > 0 && newTotal > 0) {
+          // Mixed changes or reallocation
+          
+          // Detect pure reallocation
+          if (deltaEstoque > 0 && deltaCotar < 0 && Math.abs(deltaEstoque) === Math.abs(deltaCotar)) {
+             diffLogs.push(`Item "${itemName}" remanejado: ${deltaEstoque} un. de A Cotar para Estoque.`);
+          } else if (deltaCotar > 0 && deltaEstoque < 0 && Math.abs(deltaEstoque) === Math.abs(deltaCotar)) {
+             diffLogs.push(`Item "${itemName}" remanejado: ${deltaCotar} un. de Estoque para A Cotar.`);
+          } else {
+             // Independent changes
+             if (deltaEstoque !== 0) {
+               if (oldStats.estoque === 0 && deltaEstoque > 0) {
+                 diffLogs.push(`Item adicionado (Estoque): "${itemName}" (${deltaEstoque} un.)`);
+               } else if (newStats.estoque === 0 && deltaEstoque < 0) {
+                 diffLogs.push(`Item removido do Estoque: "${itemName}"`);
+               } else {
+                 diffLogs.push(`Quantidade de "${itemName}" (Estoque) alterada: de ${oldStats.estoque} para ${newStats.estoque} un.`);
+               }
+             }
+             if (deltaCotar !== 0) {
+               if (oldStats.a_cotar === 0 && deltaCotar > 0) {
+                 diffLogs.push(`Item adicionado (A Cotar): "${itemName}" (${deltaCotar} un.)`);
+               } else if (newStats.a_cotar === 0 && deltaCotar < 0) {
+                 diffLogs.push(`Item removido de A Cotar: "${itemName}"`);
+               } else {
+                 diffLogs.push(`Quantidade de "${itemName}" (A Cotar) alterada: de ${oldStats.a_cotar} para ${newStats.a_cotar} un.`);
+               }
+             }
+          }
+        }
+      }
+      
+      if (!options?.skipDiffLog && diffLogs.length > 0) {
+        await insertLogAction(actualId, 'auto_save_diff', `Alterações no protocolo:\n${diffLogs.map(l => '- ' + l).join('\n')}`, {
+          snapshot: {
+            oldClientName: oldProtocolName,
+            newClientName: protocol.clientName,
+            oldItems: oldItems,
+            newItems: newItems,
+          }
+        });
+      }
     }
 
     return { success: true, data: updatedProtocol };
@@ -359,6 +498,8 @@ export async function reservarEstoqueAction(protocolId: string | number): Promis
 
     if (itemsError) throw itemsError;
 
+    await insertLogAction(protocolId, 'status_change', 'Protocolo movido para Reservado / Aguardando Estoque.');
+
     return { success: true };
   } catch (err: any) {
     console.error('[reservarEstoque] Exception:', err);
@@ -382,6 +523,8 @@ export async function enviarParaBlingAction(protocolId: string | number): Promis
     if (protoError) throw protoError;
     
     // We could add integration logic to Bling here later
+    
+    await insertLogAction(protocolId, 'status_change', 'Protocolo Efetivado no Bling (Finalizado).');
 
     return { success: true };
   } catch (err: any) {
@@ -413,6 +556,8 @@ export async function cancelarCotacaoAction(protocolId: string | number): Promis
       .eq('status', 'reservado');
       
     if (itemsError) console.error('Failed to un-reserve items during cancellation:', itemsError);
+    
+    await insertLogAction(protocolId, 'status_change', 'Protocolo Cancelado.');
 
     return { success: true };
   } catch (err: any) {
@@ -436,6 +581,8 @@ export async function estornarCotacaoAction(protocolId: string | number): Promis
       
     if (protoError) throw protoError;
 
+    await insertLogAction(protocolId, 'status_change', 'Protocolo Estornado (Voltou para Reserva).');
+
     return { success: true };
   } catch (err: any) {
     console.error('[estornarCotacao] Exception:', err);
@@ -458,6 +605,8 @@ export async function restaurarCotacaoAction(protocolId: string | number): Promi
       
     if (protoError) throw protoError;
     
+    await insertLogAction(protocolId, 'status_change', 'Protocolo Restaurado (Voltou para Rascunho).');
+
     return { success: true };
   } catch (err: any) {
     console.error('[restaurarCotacao] Exception:', err);
@@ -615,6 +764,9 @@ export async function getPendingApprovalsAction() {
 
 export async function approveItemAction(itemId: string) {
   const supabase = await createClient();
+  const { data: itemData, error: itemError } = await supabase.from('protocol_items').select('protocol_id, name, markup_percent').eq('id', itemId).single();
+  if (itemError) return { success: false, error: itemError.message };
+
   const { error } = await supabase
     .from('protocol_items')
     .update({ approval_status: 'approved' })
@@ -625,6 +777,8 @@ export async function approveItemAction(itemId: string) {
     return { success: false, error: error.message };
   }
   
+  await insertLogAction(itemData.protocol_id, 'markup_approved', `Markup de ${itemData.markup_percent}% aprovado para o item ${itemData.name}.`);
+
   revalidatePath('/admin/aprovacoes');
   revalidatePath('/protocolo/[id]', 'page');
   return { success: true };
@@ -633,6 +787,9 @@ export async function approveItemAction(itemId: string) {
 export async function approveWithCustomMarkupAction(itemId: string, customMarkup: number, basePrice: number) {
   console.log('approveWithCustomMarkupAction called with:', { itemId, customMarkup, basePrice });
   const supabase = await createClient();
+  const { data: itemData, error: itemError } = await supabase.from('protocol_items').select('protocol_id, name').eq('id', itemId).single();
+  if (itemError) return { success: false, error: itemError.message };
+
   const salePrice = basePrice * (1 + customMarkup / 100);
   console.log('calculated salePrice:', salePrice);
   
@@ -652,6 +809,8 @@ export async function approveWithCustomMarkupAction(itemId: string, customMarkup
   }
   console.log('update successful for item:', itemId);
   
+  await insertLogAction(itemData.protocol_id, 'markup_approved', `Markup de ${customMarkup}% aprovado (modificado) para o item ${itemData.name}.`);
+
   revalidatePath('/admin/aprovacoes');
   revalidatePath('/protocolo/[id]', 'page');
   return { success: true };
@@ -659,6 +818,8 @@ export async function approveWithCustomMarkupAction(itemId: string, customMarkup
 
 export async function rejectItemAction(itemId: string, defaultMarkup: number, basePrice: number) {
   const supabase = await createClient();
+  const { data: itemData, error: itemError } = await supabase.from('protocol_items').select('protocol_id, name, markup_percent').eq('id', itemId).single();
+  if (itemError) return { success: false, error: itemError.message };
   
   const { error } = await supabase
     .from('protocol_items')
@@ -673,7 +834,62 @@ export async function rejectItemAction(itemId: string, defaultMarkup: number, ba
     return { success: false, error: error.message };
   }
   
+  await insertLogAction(itemData.protocol_id, 'markup_rejected', `Markup de ${itemData.markup_percent}% rejeitado para o item ${itemData.name}.`);
+
   revalidatePath('/admin/aprovacoes');
   revalidatePath('/protocolo/[id]', 'page');
   return { success: true };
+}
+
+export async function insertLogAction(protocolId: string | number, actionType: string, description: string, metadata?: any) {
+  try {
+    const supabase = await createClient();
+    const numericProtocolId = typeof protocolId === 'string' ? parseInt(protocolId.replace(/\D/g, ''), 10) : protocolId;
+    
+    // We will hardcode a mock user for now as auth is phase 2
+    // If the action is approval/rejection, it's admin. Otherwise, it's a seller.
+    const isAdminAction = ['markup_approved', 'markup_rejected'].includes(actionType);
+    
+    const { error } = await supabase.from('protocol_logs').insert({
+      protocol_id: numericProtocolId,
+      action_type: actionType,
+      description,
+      metadata: metadata || {},
+      user_name: isAdminAction ? 'Admin' : 'Vendedor',
+      user_role: isAdminAction ? 'Gerente' : 'Vendedor Externo',
+      user_sector: isAdminAction ? 'Diretoria' : 'Comercial'
+    });
+
+    if (error) {
+      console.error('Error inserting protocol log:', error);
+      return { success: false, error: error.message };
+    }
+    return { success: true };
+  } catch (err: any) {
+    console.error('Error in insertLogAction:', err);
+    return { success: false, error: err.message };
+  }
+}
+
+export async function getProtocolLogsAction(protocolId: string | number) {
+  try {
+    const supabase = await createClient();
+    const numericProtocolId = typeof protocolId === 'string' ? parseInt(protocolId.replace(/\D/g, ''), 10) : protocolId;
+    
+      const { data, error } = await supabase
+        .from('protocol_logs')
+        .select('*')
+        .eq('protocol_id', numericProtocolId)
+        .order('created_at', { ascending: false })
+        .order('id', { ascending: false });
+
+      if (error) {
+      console.error('Error fetching protocol logs:', error);
+      return { success: false, error: error.message };
+    }
+    return { success: true, data };
+  } catch (err: any) {
+    console.error('Error in getProtocolLogsAction:', err);
+    return { success: false, error: err.message };
+  }
 }

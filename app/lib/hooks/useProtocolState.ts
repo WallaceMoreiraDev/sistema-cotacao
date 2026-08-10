@@ -375,6 +375,10 @@ export function useProtocolState(initialEstoque: ProtocolItem[] = [], initialACo
     }));
   }, []);
 
+  const clearItemForm = useCallback(() => {
+    setItemForm(EMPTY_ITEM_FORM);
+  }, []);
+
   return {
     estoqueItems,
     setEstoqueItems,
@@ -396,5 +400,6 @@ export function useProtocolState(initialEstoque: ProtocolItem[] = [], initialACo
     updateItemMarkup,
     updateItemField,
     updateMeasurement,
+    clearItemForm,
   };
 }
