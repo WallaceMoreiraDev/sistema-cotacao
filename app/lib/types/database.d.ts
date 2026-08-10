@@ -16,6 +16,8 @@ export interface StockProduct {
   costPrice: number;
   category: string;
   brand?: string;
+  blingId?: number;
+  supplierId?: string;
   heldBy?: StockHolder[];
   measurements?: {
     innerDiameter?: number;
@@ -32,6 +34,7 @@ export interface Supplier {
   id: string | number;
   name: string;
   type: 'Mercado Local' | 'Fornecedor Original';
+  blingId?: number;
   createdAt?: string;
 }
 
@@ -55,10 +58,7 @@ export interface ProtocolItem {
     thickness?: number;
     cs?: number;
   };
-  // ── Supplier pricing (only for 'a_cotar' items) ──
-  supplierPrices?: Record<string, number>; // { sippel: 12.50, vedpira: 15.00 }
-  chosenSupplier?: string; // auto-selected cheapest
-  chosenSupplierType?: 'Mercado Local' | 'Fornecedor Original';
+  supplierId?: string; // Vínculo exclusivo
   markupPercent?: number;
   salePrice?: number;
   needsApproval?: boolean; // true when markup differs from default
@@ -95,22 +95,15 @@ export interface Client {
   name: string;
   cnpj?: string;
   company?: string;
+  blingId?: number;
 }
 
 // ─── Seal Families (Category Groups) ───
 export interface SealFamily {
   id: string | number;
   name: string;
+  blingId?: number;
   createdAt?: string;
-}
-
-// ─── Seal Types (Specific) ───
-export interface SealType {
-  id: string | number;
-  name: string;
-  family_id: string | number;
-  family?: SealFamily; // relationship
-  requiredMeasurements?: string[];
 }
 
 // ─── System Settings ───

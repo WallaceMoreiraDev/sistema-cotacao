@@ -10,7 +10,6 @@ interface TabelaCotacaoProps {
   estoqueItemsCount: number;
   updateQuantity: (id: string, qty: number) => void;
   removeItem: (id: string) => void;
-  updateSupplierPrice: (itemId: string, supplierId: string, value: string) => void;
   updateItemMarkup: (itemId: string, value: string) => void;
   handleReallocate: (id: string, maxQty: number) => void;
   getFreeStock: (identifier: string) => number;
@@ -23,7 +22,6 @@ export function TabelaCotacao({
   estoqueItemsCount,
   updateQuantity,
   removeItem,
-  updateSupplierPrice,
   updateItemMarkup,
   handleReallocate,
   getFreeStock,
@@ -133,13 +131,9 @@ export function TabelaCotacao({
                         <input
                           type="number"
                           placeholder="R$ 0,00"
-                          value={item.supplierPrices?.[sup.id] || ''}
-                          onChange={(e) => updateSupplierPrice(item.id, sup.id, e.target.value)}
-                          className={`w-full rounded border py-1.5 px-2 text-sm text-center text-slate-900 transition-colors focus:ring-1 focus:outline-none ${
-                            item.chosenSupplier === sup.id 
-                              ? 'border-emerald-500 bg-emerald-50/30 text-emerald-900 ring-emerald-500 font-bold' 
-                              : 'border-slate-200 focus:border-emerald-500 focus:ring-emerald-500'
-                          }`}
+                          value={''}
+                          onChange={() => {}}
+                          className={`w-full rounded border py-1.5 px-2 text-sm text-center text-slate-900 transition-colors focus:ring-1 focus:outline-none border-slate-200`}
                         />
                       </div>
                     ))}
@@ -151,16 +145,7 @@ export function TabelaCotacao({
                   
                   {/* Left: Vencedor e Alertas */}
                   <div className="flex items-center gap-3">
-                    {item.chosenSupplier ? (
-                      <div className="flex items-center gap-1.5 px-2.5 py-1 bg-emerald-100 text-emerald-800 rounded-lg text-xs font-bold border border-emerald-200">
-                        <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
-                        Fornecedor Escolhido: {suppliers.find(s => s.id === item.chosenSupplier)?.name || item.chosenSupplier}
-                      </div>
-                    ) : (
-                      <div className="text-[11px] text-slate-400 font-medium italic">Nenhum custo informado</div>
-                    )}
-
-                    {canReallocate && (
+                    <div className="text-[11px] text-slate-400 font-medium italic">Nenhum custo informado</div>                    {canReallocate && (
                       <button
                         type="button"
                         onClick={() => handleReallocate(item.id, freeStock)}
@@ -177,11 +162,6 @@ export function TabelaCotacao({
                       <div className="flex flex-col items-end gap-1">
                         <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
                           Markup %
-                          {item.chosenSupplierType && (
-                            <span className="text-[8px] font-normal text-slate-400 normal-case bg-slate-100 px-1 py-0.5 rounded" title={`Padrão para ${item.chosenSupplierType}`}>
-                              (Padrão: {getDefaultMarkup(item.chosenSupplierType)}%)
-                            </span>
-                          )}
                         </label>
                         {(item.needsApproval || isRejected) && (
                           <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${isApproved ? 'bg-emerald-100 text-emerald-700' : isRejected ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>

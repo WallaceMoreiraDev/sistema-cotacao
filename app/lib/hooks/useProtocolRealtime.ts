@@ -3,8 +3,7 @@ import { createClient } from '../supabase/client';
 import { fetchStock } from '../services/stockService';
 import { getReservedStockAction } from '../actions/protocols';
 import { getClientsAction } from '../actions/clients';
-import { getSealTypesAction } from '../actions/sealTypes';
-import type { StockProduct, Client, SealType } from '../types/database';
+import type { StockProduct, Client } from '../types/database';
 
 export function useProtocolRealtime(protocolId?: number) {
   const [stockProducts, setStockProducts] = useState<StockProduct[]>([]);
@@ -13,8 +12,7 @@ export function useProtocolRealtime(protocolId?: number) {
   const [registeredClients, setRegisteredClients] = useState<Client[]>([]);
   const [clientsLoading, setClientsLoading] = useState(true);
   
-  const [registeredSealTypes, setRegisteredSealTypes] = useState<SealType[]>([]);
-  const [sealTypesLoading, setSealTypesLoading] = useState(true);
+
 
   const refreshStockData = useCallback(async () => {
     try {
@@ -76,12 +74,6 @@ export function useProtocolRealtime(protocolId?: number) {
       if (!cancelled) setClientsLoading(false);
     });
     
-    getSealTypesAction().then(res => { 
-      if (!cancelled && res.success && res.data) {
-        setRegisteredSealTypes(res.data); 
-      }
-      if (!cancelled) setSealTypesLoading(false);
-    });
 
     return () => { 
       cancelled = true; 
@@ -94,9 +86,7 @@ export function useProtocolRealtime(protocolId?: number) {
     setStockProducts, 
     stockLoading, 
     registeredClients, 
-    registeredSealTypes, 
     refreshStockData,
-    clientsLoading,
-    sealTypesLoading
+    clientsLoading
   };
 }

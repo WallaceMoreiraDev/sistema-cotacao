@@ -1,7 +1,7 @@
 'use server';
 
 import { createClient } from '../supabase/server';
-import { SystemSettings, Supplier, SealType, SealFamily } from '../types/database';
+import { SystemSettings, Supplier, SealFamily } from '../types/database';
 
 export async function getSystemSettingsAction() {
   try {
@@ -162,90 +162,4 @@ export async function deleteSealFamilyAction(id: string | number) {
   }
 }
 
-// ─── Seal Types (Tipos de Vedações) ───
-export async function getSealTypesAction() {
-  try {
-    const supabase = await createClient();
-    // Using Supabase left join syntax to get the family object
-    const { data, error } = await supabase
-      .from('seal_types')
-      .select('*, family:seal_families(*)')
-      .order('name');
 
-    if (error) throw error;
-
-    return {
-      success: true, data: data.map((d: any) => ({
-        ...d,
-        requiredMeasurements: d.required_measurements || []
-      })) as SealType[]
-    };
-  } catch (err: any) {
-    return { success: false, error: err.message };
-  }
-}
-
-export async function createSealTypeAction(sealType: Omit<SealType, 'id' | 'family'>) {
-  try {
-    const supabase = await createClient();
-    const payload = {
-      name: sealType.name,
-      family_id: sealType.family_id,
-      required_measurements: sealType.requiredMeasurements || []
-    };
-
-    const { data, error } = await supabase
-      .from('seal_types')
-      .insert([payload])
-      .select('*, family:seal_families(*)')
-      .single();
-
-    if (error) throw error;
-
-    const created = {
-      ...data,
-      requiredMeasurements: data.required_measurements || []
-    };
-
-    return { success: true, data: created as SealType };
-  } catch (err: any) {
-    return { success: false, error: err.message };
-  }
-}
-
-export async function updateSealTypeAction(id: string | number, sealType: Partial<Omit<SealType, 'id' | 'family'>>) {
-  try {
-    const supabase = await createClient();
-
-    const payload: any = {};
-    if (sealType.name !== undefined) payload.name = sealType.name;
-    if (sealType.family_id !== undefined) payload.family_id = sealType.family_id;
-    if (sealType.requiredMeasurements !== undefined) payload.required_measurements = sealType.requiredMeasurements;
-
-    const { data, error } = await supabase
-      .from('seal_types')
-      .update(payload)
-      .eq('id', id)
-      .select('*, family:seal_families(*)')
-      .single();
-
-    if (error) throw error;
-
-    return { success: true, data: { ...data, requiredMeasurements: data.required_measurements || [] } };
-  } catch (err: any) {
-    return { success: false, error: err.message };
-  }
-}
-
-export async function deleteSealTypeAction(id: string | number) {
-  try {
-    const supabase = await createClient();
-    const { error } = await supabase.from('seal_types').delete().eq('id', id);
-
-    if (error) throw error;
-
-    return { success: true };
-  } catch (err: any) {
-    return { success: false, error: err.message };
-  }
-}

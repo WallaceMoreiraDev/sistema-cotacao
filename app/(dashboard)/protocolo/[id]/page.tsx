@@ -43,7 +43,7 @@ export default function ProtocolDetailPage() {
   const protocolIdRef = useRef<string | number>(params?.id || `proto-${Date.now()}`);
 
   // ── Realtime & Data ──
-  const { stockProducts, stockLoading, registeredClients, registeredSealTypes, clientsLoading, sealTypesLoading } = useProtocolRealtime(
+  const { stockProducts, stockLoading, registeredClients, clientsLoading } = useProtocolRealtime(
     !isNaN(Number(protocolIdRef.current)) ? Number(protocolIdRef.current) : undefined
   );
 
@@ -75,7 +75,6 @@ export default function ProtocolDetailPage() {
     splitMultipleEstoqueItems,
     removeACotarItem,
     updateACotarItemQuantity,
-    updateSupplierPrice,
     updateItemMarkup,
     updateItemField,
     updateMeasurement,
@@ -136,17 +135,6 @@ export default function ProtocolDetailPage() {
     itemForm.name.trim().length > 0 &&
     Number(itemForm.quantity) > 0 &&
     Object.values(itemForm.measurements).some((m) => m.trim().length > 0);
-
-  const filteredSealTypes = useMemo(() => {
-    if (!itemForm.name.trim()) return registeredSealTypes;
-    return registeredSealTypes.filter((t) =>
-      t.name.toLowerCase().includes(itemForm.name.trim().toLowerCase())
-    );
-  }, [registeredSealTypes, itemForm.name]);
-
-  const isValidSealType = registeredSealTypes.some(
-    (t) => t.name.toLowerCase() === itemForm.name.trim().toLowerCase()
-  );
 
   const [showCancelModal, setShowCancelModal] = useState(false);
 
@@ -447,9 +435,6 @@ export default function ProtocolDetailPage() {
         quantity: split.excessQty,
         type: 'a_cotar',
         status: 'pendente',
-        supplierPrices: {},
-        chosenSupplier: undefined,
-        chosenSupplierType: undefined,
         markupPercent: undefined,
         salePrice: 0,
         unitPrice: 0,
@@ -503,9 +488,6 @@ export default function ProtocolDetailPage() {
         id: `item-${Date.now()}-${Math.random().toString(36).substring(2, 9)}-e`,
         type: 'estoque',
         quantity: qtyToMove,
-        supplierPrices: {},
-        chosenSupplier: undefined,
-        chosenSupplierType: undefined,
         markupPercent: 70,
         costPrice: costPrice,
         unitPrice: costPrice,
@@ -612,8 +594,6 @@ export default function ProtocolDetailPage() {
         itemForm={itemForm}
         updateItemField={updateItemField}
         updateMeasurement={updateMeasurement}
-        filteredSealTypes={filteredSealTypes}
-        isValidSealType={isValidSealType}
         isItemFormValid={isItemFormValid}
         isFormUnlocked={isFormUnlocked}
         handleAddItem={handleAddItem}
@@ -623,7 +603,6 @@ export default function ProtocolDetailPage() {
         allItemsCount={allItems.length}
         getFreeStock={getFreeStock}
         isViewing={isViewing}
-        sealTypesLoading={sealTypesLoading}
         onClearForm={clearItemForm}
       />
 
@@ -642,7 +621,6 @@ export default function ProtocolDetailPage() {
         estoqueItemsCount={estoqueItems.length}
         updateQuantity={updateACotarItemQuantity}
         removeItem={removeACotarItem}
-        updateSupplierPrice={updateSupplierPrice}
         updateItemMarkup={updateItemMarkup}
         handleReallocate={(id, qty) => handleReallocate(id, qty, stockProducts)}
         getFreeStock={(identifier) => getFreeStock(identifier, stockProducts)}

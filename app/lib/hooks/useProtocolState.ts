@@ -91,7 +91,6 @@ export function useProtocolState(initialEstoque: ProtocolItem[] = [], initialACo
           code: itemForm.code || undefined,
           brand: itemForm.brand || undefined,
           measurements,
-          supplierPrices: {},
           markupPercent: undefined,
           salePrice: 0,
         };
@@ -122,7 +121,6 @@ export function useProtocolState(initialEstoque: ProtocolItem[] = [], initialACo
         code: itemForm.code || undefined,
         brand: itemForm.brand || undefined,
         measurements,
-        supplierPrices: {},
         markupPercent: undefined,
         salePrice: 0,
       };
@@ -159,9 +157,6 @@ export function useProtocolState(initialEstoque: ProtocolItem[] = [], initialACo
       id: `item-${Date.now()}-${Math.random()}`,
       type: 'estoque',
       quantity: qtyToMove,
-      supplierPrices: {},
-      chosenSupplier: undefined,
-      chosenSupplierType: undefined,
       markupPercent: 70,
       costPrice: costPrice,
       unitPrice: costPrice,
@@ -208,9 +203,6 @@ export function useProtocolState(initialEstoque: ProtocolItem[] = [], initialACo
         quantity: excessQty,
         type: 'a_cotar',
         status: 'pendente',
-        supplierPrices: {},
-        chosenSupplier: undefined,
-        chosenSupplierType: undefined,
         markupPercent: undefined,
         salePrice: 0,
         unitPrice: 0,
@@ -246,9 +238,6 @@ export function useProtocolState(initialEstoque: ProtocolItem[] = [], initialACo
           quantity: split.excessQty,
           type: 'a_cotar',
           status: 'pendente',
-          supplierPrices: {},
-          chosenSupplier: undefined,
-          chosenSupplierType: undefined,
           markupPercent: undefined,
           salePrice: 0,
           unitPrice: 0,
@@ -286,64 +275,13 @@ export function useProtocolState(initialEstoque: ProtocolItem[] = [], initialACo
     setACotarItems(prev => prev.map(i => (i.id === id ? { ...i, quantity: newQty } : i)));
   }, []);
 
-  const updateSupplierPrice = useCallback((itemId: string, supplierId: string, value: string) => {
-    const numVal = parseFloat(value.replace(',', '.')) || 0;
-    setACotarItems(prev =>
-      prev.map(item => {
-        if (item.id !== itemId) return item;
-        const newPrices = { ...item.supplierPrices, [supplierId]: numVal };
-        const filledSuppliers = Object.entries(newPrices).filter(([, price]) => price > 0);
-        let chosen: string | undefined;
-        let chosenType: 'Mercado Local' | 'Fornecedor Original' | undefined;
-        let lowestPrice = Infinity;
-        for (const [sid, price] of filledSuppliers) {
-          if (price < lowestPrice) {
-            lowestPrice = price;
-            chosen = sid;
-            const supplier = suppliers.find(s => s.id === sid);
-            chosenType = supplier?.type;
-          }
-        }
-        const defaultMk = chosenType ? getDefaultMarkup(chosenType) : undefined;
-        
-        let currentMarkup = item.markupPercent;
-        
-        // Se o fornecedor vencedor mudou, ou se não tinha markup antes, volta pro padrão do vencedor
-        if (chosen !== item.chosenSupplier || currentMarkup === undefined || currentMarkup === null) {
-          currentMarkup = defaultMk;
-        }
-
-        const finalMarkup = currentMarkup ?? 0;
-        const salePrice = lowestPrice === Infinity ? 0 : lowestPrice * (1 + finalMarkup / 100);
-        const needsApproval = defaultMk !== undefined && currentMarkup !== undefined && currentMarkup !== defaultMk;
-
-        let approvalStatus = item.approvalStatus;
-        if (currentMarkup !== item.markupPercent) {
-          approvalStatus = 'pending';
-        }
-
-        return {
-          ...item,
-          supplierPrices: newPrices,
-          chosenSupplier: chosen,
-          chosenSupplierType: chosenType,
-          markupPercent: currentMarkup,
-          salePrice,
-          needsApproval,
-          approvalStatus,
-          isMarkupDirty: true,
-          unitPrice: lowestPrice === Infinity ? 0 : lowestPrice,
-        };
-      })
-    );
-  }, [suppliers]);
 
   const updateItemMarkup = useCallback((itemId: string, value: string) => {
     const numVal = parseFloat(value) || 0;
     setACotarItems(prev =>
       prev.map(item => {
         if (item.id !== itemId) return item;
-        const supplierType = item.chosenSupplierType;
+        const supplierType = 'Fornecedor Original'; // Fallback for removed type logic
         const defaultMk = supplierType ? getDefaultMarkup(supplierType) : 0;
         const needsApproval = numVal !== defaultMk;
         const basePrice = item.unitPrice ?? 0;
@@ -396,7 +334,6 @@ export function useProtocolState(initialEstoque: ProtocolItem[] = [], initialACo
     splitMultipleEstoqueItems,
     removeACotarItem,
     updateACotarItemQuantity,
-    updateSupplierPrice,
     updateItemMarkup,
     updateItemField,
     updateMeasurement,
