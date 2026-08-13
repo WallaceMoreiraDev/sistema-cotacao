@@ -22,6 +22,11 @@ export async function getSystemSettingsAction() {
       data.forEach((row) => {
         if (row.key === 'markup_original') settings.markup_original = Number(row.value);
         if (row.key === 'markup_local') settings.markup_local = Number(row.value);
+        if (row.key === 'bling_client_id') settings.bling_client_id = String(row.value).replace(/^"(.*)"$/, '$1');
+        if (row.key === 'bling_client_secret') settings.bling_client_secret = String(row.value).replace(/^"(.*)"$/, '$1');
+        if (row.key === 'bling_access_token') settings.bling_access_token = String(row.value).replace(/^"(.*)"$/, '$1');
+        if (row.key === 'bling_refresh_token') settings.bling_refresh_token = String(row.value).replace(/^"(.*)"$/, '$1');
+        if (row.key === 'bling_token_expires_at') settings.bling_token_expires_at = String(row.value).replace(/^"(.*)"$/, '$1');
       });
     }
 
@@ -39,6 +44,12 @@ export async function updateSystemSettingsAction(settings: SystemSettings) {
       { key: 'markup_original', value: settings.markup_original.toString() },
       { key: 'markup_local', value: settings.markup_local.toString() }
     ];
+
+    if (settings.bling_client_id !== undefined) updates.push({ key: 'bling_client_id', value: `"${settings.bling_client_id}"` });
+    if (settings.bling_client_secret !== undefined) updates.push({ key: 'bling_client_secret', value: `"${settings.bling_client_secret}"` });
+    if (settings.bling_access_token !== undefined) updates.push({ key: 'bling_access_token', value: `"${settings.bling_access_token}"` });
+    if (settings.bling_refresh_token !== undefined) updates.push({ key: 'bling_refresh_token', value: `"${settings.bling_refresh_token}"` });
+    if (settings.bling_token_expires_at !== undefined) updates.push({ key: 'bling_token_expires_at', value: `"${settings.bling_token_expires_at}"` });
 
     for (const update of updates) {
       const { error } = await supabase.from('system_settings').upsert(update, { onConflict: 'key' });

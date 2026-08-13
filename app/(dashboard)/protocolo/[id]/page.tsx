@@ -48,11 +48,17 @@ export default function ProtocolDetailPage() {
   );
 
   const [suppliers, setSuppliers] = useState<any[]>([]);
+  const [sealFamilies, setSealFamilies] = useState<any[]>([]);
 
   useEffect(() => {
     import('../../../lib/actions/suppliers').then(m => {
       m.getSuppliersAction().then(res => {
         if (res.success && res.data) setSuppliers(res.data);
+      });
+    });
+    import('../../../lib/actions/sealFamilies').then(m => {
+      m.getSealFamiliesAction().then(res => {
+        if (res.success && res.data) setSealFamilies(res.data);
       });
     });
   }, []);
@@ -68,6 +74,7 @@ export default function ProtocolDetailPage() {
     addFeedback,
     getFreeStock,
     handleAddItem,
+    handleAddStockItem,
     handleReallocate,
     removeEstoqueItem,
     updateEstoqueItemQuantity,
@@ -132,9 +139,9 @@ export default function ProtocolDetailPage() {
     : clientName.trim().length > 0;
 
   const isItemFormValid =
-    itemForm.name.trim().length > 0 &&
+    itemForm.category?.trim().length > 0 &&
     Number(itemForm.quantity) > 0 &&
-    Object.values(itemForm.measurements).some((m) => m.trim().length > 0);
+    Object.values(itemForm.measurements).some((m) => m?.trim().length > 0);
 
   const [showCancelModal, setShowCancelModal] = useState(false);
 
@@ -592,11 +599,13 @@ export default function ProtocolDetailPage() {
 
       <FormularioAdicaoItem
         itemForm={itemForm}
+        sealFamilies={sealFamilies}
         updateItemField={updateItemField}
         updateMeasurement={updateMeasurement}
         isItemFormValid={isItemFormValid}
         isFormUnlocked={isFormUnlocked}
         handleAddItem={handleAddItem}
+        handleAddStockItem={handleAddStockItem}
         addFeedback={addFeedback}
         stockProducts={stockProducts}
         stockLoading={stockLoading}

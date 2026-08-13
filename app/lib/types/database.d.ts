@@ -16,6 +16,9 @@ export interface StockProduct {
   costPrice: number;
   category: string;
   brand?: string;
+  part_type?: string;
+  parker_code?: string;
+  oem_code?: string;
   blingId?: number;
   supplierId?: string;
   heldBy?: StockHolder[];
@@ -46,10 +49,12 @@ export interface ProtocolItem {
   unitPrice: number;
   type: 'estoque' | 'a_cotar';
   status: 'pendente' | 'aprovado' | 'reprovado' | 'reservado';
-  oem?: string;
-  nickname?: string;
-  code?: string; // código da vedação
+  oem_code?: string;
+  code?: string; // código da vedação (SKU FM)
   brand?: string;
+  part_type?: string;
+  parker_code?: string;
+  description?: string; // Nome inteligente gerado
   measurements?: {
     innerDiameter?: number;
     outerDiameter?: number;
@@ -110,6 +115,11 @@ export interface SealFamily {
 export interface SystemSettings {
   markup_original: number;
   markup_local: number;
+  bling_client_id?: string;
+  bling_client_secret?: string;
+  bling_access_token?: string;
+  bling_refresh_token?: string;
+  bling_token_expires_at?: string;
 }
 
 // ─── User Profile (Fase 2) ───

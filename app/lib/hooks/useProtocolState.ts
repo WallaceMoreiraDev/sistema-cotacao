@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react';
 import type { ProtocolItem, StockProduct } from '../types/database';
-import { areItemsMatching } from '../utils/protocolFormatters';
+import { areItemsMatching, formatMeasurement } from '../utils/protocolFormatters';
+import { buildSmartDescription, generateFMCode } from '../utils/productNameBuilder';
 import { ItemFormState, EMPTY_ITEM_FORM } from '../config/protocolForm';
 import { findStockMatch } from '../services/stockService';
 import { getDefaultMarkup } from '../config/suppliers';
@@ -17,10 +18,10 @@ export function useProtocolState(initialEstoque: ProtocolItem[] = [], initialACo
   const getFreeStock = useCallback((identifier: string, stockProducts: StockProduct[]) => {
     const product = stockProducts.find(p => (p.code || p.sku || p.name) === identifier);
     if (!product) return 0;
-    
-    let available = product.stock; 
+
+    let available = product.stock;
     const localConsumed = estoqueItems
-      .filter(i => (i.code || i.oem || i.name) === identifier)
+      .filter(i => (i.code || i.oem_code || i.name) === identifier)
       .reduce((sum, i) => sum + Number(i.quantity), 0);
 
     return Math.max(0, available - localConsumed);
@@ -38,7 +39,7 @@ export function useProtocolState(initialEstoque: ProtocolItem[] = [], initialACo
       cs: parseFloat(itemForm.measurements.cs) || undefined,
     };
 
-    const match = findStockMatch(stockProducts, itemForm.name, measurements, itemForm.brand);
+    const match = findStockMatch(stockProducts, itemForm.category, measurements, itemForm.brand);
     const identifier = match ? (match.code || match.sku || match.name) : '';
     const availableStock = match ? getFreeStock(identifier, stockProducts) : 0;
 
@@ -51,16 +52,18 @@ export function useProtocolState(initialEstoque: ProtocolItem[] = [], initialACo
       newCounter++;
       const stockItem: ProtocolItem = {
         id: `item-${Date.now()}-e`,
-        name: itemForm.name,
+        name: itemForm.category || 'N/A',
         quantity: stockQty,
         unitPrice: match.costPrice,
         costPrice: match.costPrice,
         type: 'estoque',
         status: 'pendente',
-        oem: itemForm.oem || match.sku || undefined,
-        nickname: itemForm.nickname || undefined,
-        code: match.code || itemForm.code || undefined,
+        oem_code: itemForm.oemCode || match.oem_code || undefined,
+        code: match.code || (itemForm.supplierCode ? `FM-${itemForm.supplierCode.toUpperCase()}` : undefined),
         brand: itemForm.brand || match.brand || undefined,
+        part_type: itemForm.partType || match.part_type || undefined,
+        parker_code: itemForm.parkerCode || match.parker_code || undefined,
+        description: itemForm.description || undefined,
         measurements,
         stockQty: availableStock,
         productId: match.id,
@@ -81,15 +84,17 @@ export function useProtocolState(initialEstoque: ProtocolItem[] = [], initialACo
         newCounter++;
         const quotedItem: ProtocolItem = {
           id: `item-${Date.now()}-c`,
-          name: itemForm.name,
+          name: itemForm.category || 'N/A',
           quantity: remainQty,
           unitPrice: 0,
           type: 'a_cotar',
           status: 'pendente',
-          oem: itemForm.oem || undefined,
-          nickname: itemForm.nickname || undefined,
-          code: itemForm.code || undefined,
+          oem_code: itemForm.oemCode || undefined,
+          code: itemForm.supplierCode ? `FM-${itemForm.supplierCode.toUpperCase()}` : undefined,
           brand: itemForm.brand || undefined,
+          part_type: itemForm.partType || undefined,
+          parker_code: itemForm.parkerCode || undefined,
+          description: itemForm.description || undefined,
           measurements,
           markupPercent: undefined,
           salePrice: 0,
@@ -111,15 +116,17 @@ export function useProtocolState(initialEstoque: ProtocolItem[] = [], initialACo
       newCounter++;
       const quotedItem: ProtocolItem = {
         id: `item-${Date.now()}-c`,
-        name: itemForm.name,
+        name: itemForm.category || 'N/A',
         quantity: qty,
         unitPrice: 0,
         type: 'a_cotar',
         status: 'pendente',
-        oem: itemForm.oem || undefined,
-        nickname: itemForm.nickname || undefined,
-        code: itemForm.code || undefined,
+        oem_code: itemForm.oemCode || undefined,
+        code: itemForm.supplierCode ? `FM-${itemForm.supplierCode.toUpperCase()}` : undefined,
         brand: itemForm.brand || undefined,
+        part_type: itemForm.partType || undefined,
+        parker_code: itemForm.parkerCode || undefined,
+        description: itemForm.description || undefined,
         measurements,
         markupPercent: undefined,
         salePrice: 0,
@@ -141,6 +148,167 @@ export function useProtocolState(initialEstoque: ProtocolItem[] = [], initialACo
     setTimeout(() => setAddFeedback(null), 4000);
   }, [itemForm, itemCounter, getFreeStock]);
 
+  const handleAddStockItem = useCallback((match: StockProduct, qty: number, ignoreStock: boolean) => {
+    if (qty <= 0) return;
+    const identifier = match.code || match.sku || match.name;
+    const availableStock = getFreeStock(identifier, [match]);
+
+    let newCounter = itemCounter;
+
+    if (!ignoreStock && availableStock > 0) {
+      const stockQty = Math.min(qty, availableStock);
+      const remainQty = qty - stockQty;
+
+      newCounter++;
+      const stockItem: ProtocolItem = {
+        id: `item-${Date.now()}-e`,
+        name: match.category || match.name || 'N/A',
+        quantity: stockQty,
+        unitPrice: match.costPrice,
+        costPrice: match.costPrice,
+        type: 'estoque',
+        status: 'pendente',
+        oem_code: match.oem_code || undefined,
+        code: match.code || match.sku || undefined,
+        brand: match.brand || undefined,
+        part_type: match.part_type || undefined,
+        parker_code: match.parker_code || undefined,
+        description: match.name || undefined,
+        measurements: match.measurements || {},
+        stockQty: availableStock,
+        productId: match.id,
+        markupPercent: 70,
+        salePrice: match.costPrice * 1.7,
+      };
+      setEstoqueItems(prev => {
+        const existingIdx = prev.findIndex(i => areItemsMatching(i, stockItem));
+        if (existingIdx >= 0) {
+          const updated = [...prev];
+          updated[existingIdx] = { ...updated[existingIdx], quantity: updated[existingIdx].quantity + stockQty };
+          return updated;
+        }
+        return [...prev, stockItem];
+      });
+
+      if (remainQty > 0) {
+        newCounter++;
+        const quotedItem: ProtocolItem = {
+          id: `item-${Date.now()}-c`,
+          name: match.category || match.name || 'N/A',
+          quantity: remainQty,
+          unitPrice: 0,
+          type: 'a_cotar',
+          status: 'pendente',
+          oem_code: match.oem_code || undefined,
+          code: match.code || match.sku || undefined,
+          brand: match.brand || undefined,
+          part_type: match.part_type || undefined,
+          parker_code: match.parker_code || undefined,
+          description: match.name || undefined,
+          measurements: match.measurements || {},
+          markupPercent: undefined,
+          salePrice: 0,
+        };
+        setACotarItems(prev => {
+          const existingIdx = prev.findIndex(i => areItemsMatching(i, quotedItem));
+          if (existingIdx >= 0) {
+            const updated = [...prev];
+            updated[existingIdx] = { ...updated[existingIdx], quantity: updated[existingIdx].quantity + remainQty };
+            return updated;
+          }
+          return [...prev, quotedItem];
+        });
+        setAddFeedback(`Estoque parcial: ${stockQty} un. → Estoque, ${remainQty} un. → A Cotar`);
+      } else {
+        setAddFeedback(`${stockQty} un. adicionadas à lista de Estoque`);
+      }
+    } else {
+      newCounter++;
+      const quotedItem: ProtocolItem = {
+        id: `item-${Date.now()}-c`,
+        name: match.category || match.name || 'N/A',
+        quantity: qty,
+        unitPrice: 0,
+        type: 'a_cotar',
+        status: 'pendente',
+        oem_code: match.oem_code || undefined,
+        code: match.code || match.sku || undefined,
+        brand: match.brand || undefined,
+        part_type: match.part_type || undefined,
+        parker_code: match.parker_code || undefined,
+        description: match.name || undefined,
+        measurements: match.measurements || {},
+        markupPercent: undefined,
+        salePrice: 0,
+      };
+      setACotarItems(prev => {
+        const existingIdx = prev.findIndex(i => areItemsMatching(i, quotedItem));
+        if (existingIdx >= 0) {
+          const updated = [...prev];
+          updated[existingIdx] = { ...updated[existingIdx], quantity: updated[existingIdx].quantity + qty };
+          return updated;
+        }
+        return [...prev, quotedItem];
+      });
+      setAddFeedback(ignoreStock ? 'Item enviado para cotação (Estoque ignorado)' : 'Sem estoque disponível — item enviado para cotação');
+    }
+
+    setItemCounter(newCounter);
+    setTimeout(() => setAddFeedback(null), 4000);
+  }, [itemCounter, getFreeStock]);
+
+  const handleCreateNewItem = useCallback(() => {
+    let newCounter = itemCounter + 1;
+    
+    const qty = Number(itemForm.quantity) || 1;
+    if (qty <= 0) return;
+
+    // Transform string measurements to number
+    const measurements = {
+      innerDiameter: itemForm.measurements.innerDiameter ? Number(itemForm.measurements.innerDiameter) : undefined,
+      outerDiameter: itemForm.measurements.outerDiameter ? Number(itemForm.measurements.outerDiameter) : undefined,
+      height1: itemForm.measurements.height1 ? Number(itemForm.measurements.height1) : undefined,
+      height2: itemForm.measurements.height2 ? Number(itemForm.measurements.height2) : undefined,
+      thickness: itemForm.measurements.thickness ? Number(itemForm.measurements.thickness) : undefined,
+      cs: itemForm.measurements.cs ? Number(itemForm.measurements.cs) : undefined,
+    };
+
+    const smartName = buildSmartDescription({
+      category: itemForm.category,
+      measurements: measurements,
+      partType: itemForm.partType,
+      supplierCode: itemForm.supplierCode,
+      parkerOemCode: itemForm.parkerCode || itemForm.oemCode,
+      brand: itemForm.brand,
+    });
+    
+    const fmCode = generateFMCode(itemForm.supplierCode);
+
+    const newItem: ProtocolItem = {
+      id: `item-${Date.now()}-c`,
+      name: smartName || itemForm.category || 'NOVO ITEM',
+      quantity: qty,
+      unitPrice: 0,
+      type: 'a_cotar',
+      status: 'pendente',
+      oem_code: itemForm.oemCode || undefined,
+      code: fmCode || undefined,
+      brand: itemForm.brand || undefined,
+      part_type: itemForm.partType || undefined,
+      parker_code: itemForm.parkerCode || undefined,
+      description: itemForm.description || undefined,
+      measurements,
+      markupPercent: undefined,
+      salePrice: 0,
+    };
+
+    setACotarItems(prev => [...prev, newItem]);
+    setItemCounter(newCounter);
+    setItemForm(EMPTY_ITEM_FORM);
+    setAddFeedback('Novo item criado e adicionado para cotação');
+    setTimeout(() => setAddFeedback(null), 4000);
+  }, [itemForm, itemCounter]);
+
   const handleReallocate = useCallback((id: string, maxQty: number, stockProducts: StockProduct[]) => {
     const targetItem = aCotarItems.find(i => i.id === id);
     if (!targetItem) return;
@@ -148,7 +316,7 @@ export function useProtocolState(initialEstoque: ProtocolItem[] = [], initialACo
     const currentQty = Number(targetItem.quantity);
     const qtyToMove = Math.min(currentQty, maxQty);
 
-    const identifier = targetItem.code || targetItem.oem || targetItem.name;
+    const identifier = targetItem.code || targetItem.oem_code || targetItem.name;
     const product = stockProducts.find(p => (p.code || p.sku || p.name) === identifier);
     const costPrice = product ? product.costPrice : 0;
 
@@ -195,7 +363,7 @@ export function useProtocolState(initialEstoque: ProtocolItem[] = [], initialACo
   const splitEstoqueItem = useCallback((id: string, maxStock: number, excessQty: number) => {
     const item = estoqueItems.find(i => i.id === id);
     if (!item) return;
-    
+
     setACotarItems(cotarPrev => {
       const quotedItem: ProtocolItem = {
         ...item,
@@ -227,7 +395,7 @@ export function useProtocolState(initialEstoque: ProtocolItem[] = [], initialACo
 
     setACotarItems(cotarPrev => {
       let updatedCotar = [...cotarPrev];
-      
+
       for (const split of splits) {
         const item = estoqueItems.find(i => i.id === split.id);
         if (!item) continue;
@@ -247,9 +415,9 @@ export function useProtocolState(initialEstoque: ProtocolItem[] = [], initialACo
 
         const existingIdx = updatedCotar.findIndex(i => areItemsMatching(i, quotedItem));
         if (existingIdx >= 0) {
-          updatedCotar[existingIdx] = { 
-            ...updatedCotar[existingIdx], 
-            quantity: Number(updatedCotar[existingIdx].quantity) + split.excessQty 
+          updatedCotar[existingIdx] = {
+            ...updatedCotar[existingIdx],
+            quantity: Number(updatedCotar[existingIdx].quantity) + split.excessQty
           };
         } else {
           updatedCotar.push(quotedItem);
@@ -286,7 +454,7 @@ export function useProtocolState(initialEstoque: ProtocolItem[] = [], initialACo
         const needsApproval = numVal !== defaultMk;
         const basePrice = item.unitPrice ?? 0;
         const salePrice = basePrice * (1 + numVal / 100);
-        
+
         let approvalStatus = item.approvalStatus;
         if (numVal !== item.markupPercent) {
           approvalStatus = 'pending';
@@ -297,7 +465,7 @@ export function useProtocolState(initialEstoque: ProtocolItem[] = [], initialACo
     );
   }, []);
 
-  const updateItemField = useCallback((field: keyof ItemFormState, value: string) => {
+  const updateItemField = useCallback((field: keyof ItemFormState, value: string | boolean) => {
     setItemForm(prev => {
       if (field in prev.measurements) {
         return { ...prev, measurements: { ...prev.measurements, [field]: value } };
@@ -327,6 +495,8 @@ export function useProtocolState(initialEstoque: ProtocolItem[] = [], initialACo
     addFeedback,
     getFreeStock,
     handleAddItem,
+    handleAddStockItem,
+    handleCreateNewItem,
     handleReallocate,
     removeEstoqueItem,
     updateEstoqueItemQuantity,

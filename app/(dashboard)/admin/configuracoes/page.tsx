@@ -2,6 +2,11 @@
 
 import { useState, useEffect } from 'react';
 import { getSystemSettingsAction, updateSystemSettingsAction } from '../../../lib/actions/admin';
+import {
+  syncBlingCategoriesAction,
+  syncBlingProductsAction,
+  syncBlingStockAction,
+} from '../../../lib/actions/sync';
 import type { SystemSettings } from '../../../lib/types/database';
 import toast from 'react-hot-toast';
 
@@ -131,6 +136,168 @@ export default function SettingsPage() {
                     </div>
                   </div>
                 </div>
+              </div>
+
+              {/* Bling Integration Section */}
+              <div className="mt-8 border-t border-slate-200/80 pt-8">
+                <div className="mb-6">
+                  <h2 className="text-xl font-bold text-slate-800">Integração Bling ERP</h2>
+                  <p className="text-sm text-slate-500 mt-1">Configure as credenciais OAuth v3 para sincronização de produtos e estoque.</p>
+                </div>
+                
+                <div className="grid gap-6 sm:grid-cols-2">
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 uppercase tracking-widest mb-2">Client ID</label>
+                    <input
+                      type="text"
+                      value={settings.bling_client_id || ''}
+                      onChange={(e) => setSettings({ ...settings, bling_client_id: e.target.value })}
+                      className="block w-full rounded-xl border-slate-200 bg-slate-50/50 py-3 px-4 text-sm font-medium text-slate-800 outline-none transition-all focus:border-[#F7C00C] focus:bg-white focus:ring-4 focus:ring-[#F7C00C]/10"
+                      placeholder="Cole o Client ID aqui"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-400 uppercase tracking-widest mb-2">Client Secret</label>
+                    <input
+                      type="password"
+                      value={settings.bling_client_secret || ''}
+                      onChange={(e) => setSettings({ ...settings, bling_client_secret: e.target.value })}
+                      className="block w-full rounded-xl border-slate-200 bg-slate-50/50 py-3 px-4 text-sm font-medium text-slate-800 outline-none transition-all focus:border-[#F7C00C] focus:bg-white focus:ring-4 focus:ring-[#F7C00C]/10"
+                      placeholder="Cole o Client Secret aqui"
+                    />
+                  </div>
+                </div>
+
+                {settings.bling_client_id && (
+                  <div className="mt-6 flex flex-col gap-4 rounded-xl bg-blue-50/50 border border-blue-100 p-5">
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                      <p className="text-sm text-blue-800">
+                        <strong>Status:</strong> {settings.bling_access_token ? (
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-100 px-2.5 py-0.5 text-xs font-semibold text-emerald-800">
+                            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg>
+                            Autenticado e Conectado
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-100 px-2.5 py-0.5 text-xs font-semibold text-amber-800">
+                            Aguardando Autorização (OAuth)
+                          </span>
+                        )}
+                        
+                        {settings.bling_access_token && (
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              if (!confirm('Deseja realmente desconectar e limpar os tokens do Bling?')) return;
+                              
+                              const clearedSettings = {
+                                ...settings,
+                                bling_access_token: '',
+                                bling_refresh_token: '',
+                                bling_token_expires_at: ''
+                              };
+                              
+                              toast.loading('Desconectando...', { id: 'disconnect' });
+                              const res = await updateSystemSettingsAction(clearedSettings);
+                              
+                              if (res.success) {
+                                toast.success('Desconectado com sucesso!', { id: 'disconnect' });
+                                window.location.reload();
+                              } else {
+                                toast.error('Erro ao desconectar', { id: 'disconnect' });
+                              }
+                            }}
+                            className="ml-3 text-xs font-medium text-slate-500 hover:text-red-600 underline underline-offset-2 transition-colors"
+                          >
+                            Desconectar / Limpar Tokens
+                          </button>
+                        )}
+                      </p>
+
+                      {settings.bling_access_token && (
+                        <div className="flex gap-2">
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              toast.loading('Sincronizando Categorias...', { id: 'syncCat' });
+                              const res = await syncBlingCategoriesAction();
+                              if (res.success) toast.success(res.message, { id: 'syncCat' });
+                              else toast.error(res.error ? String(res.error) : 'Erro ao sincronizar', { id: 'syncCat' });
+                            }}
+                            className="rounded-lg bg-white border border-blue-200 px-4 py-2 text-xs font-bold text-blue-700 hover:bg-blue-50 transition-colors shadow-sm"
+                          >
+                            Puxar Categorias
+                          </button>
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              toast.loading('Sincronizando Produtos...', { id: 'syncProd' });
+                              const res = await syncBlingProductsAction();
+                              if (res.success) toast.success(res.message, { id: 'syncProd' });
+                              else toast.error(res.error ? String(res.error) : 'Erro ao sincronizar', { id: 'syncProd' });
+                            }}
+                            className="rounded-lg bg-blue-600 border border-blue-700 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700 transition-colors shadow-sm"
+                          >
+                            Puxar Produtos
+                          </button>
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              toast.loading('Sincronizando Estoques...', { id: 'syncStock' });
+                              const res = await syncBlingStockAction();
+                              if (res.success) toast.success(res.message, { id: 'syncStock' });
+                              else toast.error(res.error ? String(res.error) : 'Erro ao sincronizar', { id: 'syncStock' });
+                            }}
+                            className="rounded-lg bg-emerald-600 border border-emerald-700 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-700 transition-colors shadow-sm"
+                          >
+                            Sincronizar Estoque Físico
+                          </button>
+                        </div>
+                      )}
+                    </div>
+                    
+                    {!settings.bling_access_token && (
+                      <div className="flex gap-4 items-end">
+                        <div className="flex-1">
+                          <label className="block text-xs font-semibold text-blue-800 uppercase tracking-widest mb-2">Código de Autorização (Code)</label>
+                          <input
+                            type="text"
+                            id="bling_code_input"
+                            className="block w-full rounded-xl border-blue-200 bg-white py-2 px-4 text-sm font-medium text-slate-800 outline-none transition-all focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10"
+                            placeholder="Cole o código (code) recebido na URL do Bling"
+                          />
+                        </div>
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            const code = (document.getElementById('bling_code_input') as HTMLInputElement).value;
+                            if (!code) return toast.error('Cole o código de autorização primeiro.');
+                            
+                            try {
+                              const res = await fetch('/api/bling/oauth', {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ code })
+                              });
+                              
+                              const data = await res.json();
+                              if (data.success) {
+                                toast.success('Bling conectado com sucesso!');
+                                window.location.reload();
+                              } else {
+                                toast.error(data.error || 'Erro ao conectar');
+                              }
+                            } catch (err) {
+                              toast.error('Falha de rede.');
+                            }
+                          }}
+                          className="rounded-xl bg-blue-600 px-6 py-2 text-sm font-bold text-white hover:bg-blue-700 transition-colors"
+                        >
+                          Autorizar Código
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
 
               <div className="flex items-center justify-between border-t border-slate-100 pt-6">

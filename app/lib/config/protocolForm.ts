@@ -12,23 +12,29 @@ export const MEASUREMENT_FIELDS = [
 export type MeasurementKey = (typeof MEASUREMENT_FIELDS)[number]['key'];
 
 export interface ItemFormState {
-  name: string;
-  oem: string;
-  nickname: string;
-  code: string;
+  category: string; // Nome da Peça
+  partType: string;
+  supplierCode: string;
+  parkerCode: string;
+  oemCode: string;
   brand: string;
   quantity: string;
+  description: string; // Descrição Gerada Manualmente ou Auto
   ignoreStock: boolean;
   measurements: Record<MeasurementKey, string>;
+  // Mantendo para compatibilidade antiga temporariamente ou removendo
+  // name, oem, nickname, code são substituídos pela nova lógica
 }
 
 export const EMPTY_ITEM_FORM: ItemFormState = {
-  name: '',
-  oem: '',
-  nickname: '',
-  code: '',
+  category: '',
+  partType: '',
+  supplierCode: '',
+  parkerCode: '',
+  oemCode: '',
   brand: '',
   quantity: '',
+  description: '',
   ignoreStock: false,
   measurements: {
     innerDiameter: '',
