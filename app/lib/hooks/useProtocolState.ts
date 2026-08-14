@@ -214,7 +214,15 @@ export function useProtocolState(initialEstoque: ProtocolItem[] = [], initialACo
           const existingIdx = prev.findIndex(i => areItemsMatching(i, quotedItem));
           if (existingIdx >= 0) {
             const updated = [...prev];
-            updated[existingIdx] = { ...updated[existingIdx], quantity: updated[existingIdx].quantity + remainQty };
+            const existing = updated[existingIdx];
+            updated[existingIdx] = { 
+              ...existing, 
+              quantity: existing.quantity + remainQty,
+              costPrice: existing.costPrice || quotedItem.costPrice,
+              unitPrice: existing.costPrice ? existing.unitPrice : quotedItem.unitPrice,
+              salePrice: existing.costPrice ? existing.salePrice : quotedItem.salePrice,
+              markupPercent: existing.costPrice ? existing.markupPercent : quotedItem.markupPercent
+            };
             return updated;
           }
           return [...prev, quotedItem];
@@ -381,7 +389,15 @@ export function useProtocolState(initialEstoque: ProtocolItem[] = [], initialACo
       const existingIdx = cotarPrev.findIndex(i => areItemsMatching(i, quotedItem));
       if (existingIdx >= 0) {
         const updated = [...cotarPrev];
-        updated[existingIdx] = { ...updated[existingIdx], quantity: Number(updated[existingIdx].quantity) + excessQty };
+        const existing = updated[existingIdx];
+        updated[existingIdx] = { 
+          ...existing, 
+          quantity: Number(existing.quantity) + excessQty,
+          costPrice: existing.costPrice || quotedItem.costPrice,
+          unitPrice: existing.costPrice ? existing.unitPrice : quotedItem.unitPrice,
+          salePrice: existing.costPrice ? existing.salePrice : quotedItem.salePrice,
+          markupPercent: existing.costPrice ? existing.markupPercent : quotedItem.markupPercent
+        };
         return updated;
       }
       return [...cotarPrev, quotedItem];
@@ -414,9 +430,14 @@ export function useProtocolState(initialEstoque: ProtocolItem[] = [], initialACo
 
         const existingIdx = updatedCotar.findIndex(i => areItemsMatching(i, quotedItem));
         if (existingIdx >= 0) {
+          const existing = updatedCotar[existingIdx];
           updatedCotar[existingIdx] = {
-            ...updatedCotar[existingIdx],
-            quantity: Number(updatedCotar[existingIdx].quantity) + split.excessQty
+            ...existing,
+            quantity: Number(existing.quantity) + split.excessQty,
+            costPrice: existing.costPrice || quotedItem.costPrice,
+            unitPrice: existing.costPrice ? existing.unitPrice : quotedItem.unitPrice,
+            salePrice: existing.costPrice ? existing.salePrice : quotedItem.salePrice,
+            markupPercent: existing.costPrice ? existing.markupPercent : quotedItem.markupPercent
           };
         } else {
           updatedCotar.push(quotedItem);
