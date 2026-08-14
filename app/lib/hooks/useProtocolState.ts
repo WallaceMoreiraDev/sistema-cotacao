@@ -525,7 +525,8 @@ export function useProtocolState(initialEstoque: ProtocolItem[] = [], initialACo
 
 
   const updateItemMarkup = useCallback((itemId: string, value: string) => {
-    const numVal = parseFloat(value) || 0;
+    const isReset = value.trim() === '';
+    
     setACotarItems(prev =>
       prev.map(item => {
         if (item.id !== itemId) return item;
@@ -548,6 +549,7 @@ export function useProtocolState(initialEstoque: ProtocolItem[] = [], initialACo
         }
 
         const defaultMk = getDefaultMarkup(supplierType);
+        const numVal = isReset ? defaultMk : (parseFloat(value) || 0);
         const needsApproval = numVal !== defaultMk;
         
         let baseCost = item.unitPrice ?? 0;
@@ -562,7 +564,9 @@ export function useProtocolState(initialEstoque: ProtocolItem[] = [], initialACo
           approvalStatus = 'pending';
         }
 
-        return { ...item, markupPercent: numVal, salePrice, unitPrice: baseCost, needsApproval, approvalStatus, isMarkupDirty: true };
+        const isMarkupDirty = !isReset && needsApproval;
+
+        return { ...item, markupPercent: numVal, salePrice, unitPrice: baseCost, needsApproval, approvalStatus, isMarkupDirty };
       })
     );
   }, [suppliers]);
