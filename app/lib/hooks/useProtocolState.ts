@@ -196,7 +196,6 @@ export function useProtocolState(initialEstoque: ProtocolItem[] = [], initialACo
           id: `item-${Date.now()}-c`,
           name: match.category || match.name || 'N/A',
           quantity: remainQty,
-          unitPrice: 0,
           costPrice: match.costPrice,
           type: 'a_cotar',
           status: 'pendente',
@@ -231,7 +230,6 @@ export function useProtocolState(initialEstoque: ProtocolItem[] = [], initialACo
         name: match.category || match.name || 'N/A',
         quantity: qty,
         unitPrice: 0,
-        costPrice: match.costPrice,
         type: 'a_cotar',
         status: 'pendente',
         oem_code: match.oem_code || undefined,
@@ -241,9 +239,8 @@ export function useProtocolState(initialEstoque: ProtocolItem[] = [], initialACo
         parker_code: match.parker_code || undefined,
         description: match.name || undefined,
         measurements: match.measurements || {},
-        markupPercent: 70,
-        salePrice: (match.costPrice || 0) * 1.7,
-        unitPrice: match.costPrice || 0,
+        markupPercent: undefined,
+        salePrice: 0,
       };
       setACotarItems(prev => {
         const existingIdx = prev.findIndex(i => areItemsMatching(i, quotedItem));
