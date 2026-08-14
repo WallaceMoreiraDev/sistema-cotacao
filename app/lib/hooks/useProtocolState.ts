@@ -450,23 +450,43 @@ export function useProtocolState(initialEstoque: ProtocolItem[] = [], initialACo
         newCosts[supplierId] = cost;
         
         const hasStockCost = (item.costPrice ?? 0) > 0;
+        
+        const validEntries = Object.entries(newCosts).filter(([_, v]) => v > 0);
+        let cheapestSupplierId: string | null = null;
         let baseCost = 0;
-        if (hasStockCost) {
-          baseCost = item.costPrice!;
-        } else {
-          const validCosts = Object.values(newCosts).filter(v => v > 0);
-          baseCost = validCosts.length > 0 ? Math.min(...validCosts) : 0;
+        
+        if (validEntries.length > 0) {
+          const cheapest = validEntries.reduce((min, current) => current[1] < min[1] ? current : min);
+          cheapestSupplierId = cheapest[0];
+          baseCost = cheapest[1];
         }
 
-        const supplierType = 'Fornecedor Original'; // Fallback
+        if (hasStockCost) {
+          baseCost = item.costPrice!;
+        }
+
+        let supplierType: 'Fornecedor Original' | 'Mercado Local' = 'Fornecedor Original'; // Fallback
+        if (cheapestSupplierId) {
+          const sup = suppliers.find(s => String(s.id) === cheapestSupplierId);
+          if (sup && (sup.type === 'Fornecedor Original' || sup.type === 'Mercado Local')) {
+            supplierType = sup.type;
+          }
+        }
+
         const defaultMk = getDefaultMarkup(supplierType);
-        const mk = item.markupPercent ?? defaultMk;
+        const mk = !item.isMarkupDirty ? defaultMk : (item.markupPercent ?? defaultMk);
         const salePrice = baseCost * (1 + mk / 100);
 
-        return { ...item, supplierCosts: newCosts, unitPrice: baseCost, salePrice };
+        return { 
+          ...item, 
+          supplierCosts: newCosts, 
+          unitPrice: baseCost, 
+          markupPercent: mk,
+          salePrice 
+        };
       })
     );
-  }, []);
+  }, [suppliers]);
 
 
   const updateItemMarkup = useCallback((itemId: string, value: string) => {
@@ -474,7 +494,22 @@ export function useProtocolState(initialEstoque: ProtocolItem[] = [], initialACo
     setACotarItems(prev =>
       prev.map(item => {
         if (item.id !== itemId) return item;
-        const supplierType = 'Fornecedor Original'; // Fallback
+
+        const validEntries = Object.entries(item.supplierCosts || {}).filter(([_, v]) => v > 0);
+        let cheapestSupplierId: string | null = null;
+        if (validEntries.length > 0) {
+          const cheapest = validEntries.reduce((min, current) => current[1] < min[1] ? current : min);
+          cheapestSupplierId = cheapest[0];
+        }
+
+        let supplierType: 'Fornecedor Original' | 'Mercado Local' = 'Fornecedor Original'; // Fallback
+        if (cheapestSupplierId) {
+          const sup = suppliers.find(s => String(s.id) === cheapestSupplierId);
+          if (sup && (sup.type === 'Fornecedor Original' || sup.type === 'Mercado Local')) {
+            supplierType = sup.type;
+          }
+        }
+
         const defaultMk = getDefaultMarkup(supplierType);
         const needsApproval = numVal !== defaultMk;
         
@@ -494,7 +529,7 @@ export function useProtocolState(initialEstoque: ProtocolItem[] = [], initialACo
         return { ...item, markupPercent: numVal, salePrice, unitPrice: baseCost, needsApproval, approvalStatus, isMarkupDirty: true };
       })
     );
-  }, []);
+  }, [suppliers]);
 
   const updateItemField = useCallback((field: keyof ItemFormState, value: string | boolean) => {
     setItemForm(prev => {
