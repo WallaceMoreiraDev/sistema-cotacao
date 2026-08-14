@@ -233,11 +233,17 @@ export function useProtocolState(initialEstoque: ProtocolItem[] = [], initialACo
       }
     } else {
       newCounter++;
+      const localConsumed = estoqueItems
+        .filter(i => (i.code || i.oem_code || i.name) === identifier)
+        .reduce((sum, i) => sum + Number(i.quantity), 0);
+      const isMisto = localConsumed > 0 && !ignoreStock;
+
       const quotedItem: ProtocolItem = {
         id: `item-${Date.now()}-c`,
         name: match.category || match.name || 'N/A',
         quantity: qty,
-        unitPrice: 0,
+        unitPrice: isMisto ? (match.costPrice || 0) : 0,
+        costPrice: isMisto ? match.costPrice : undefined,
         type: 'a_cotar',
         status: 'pendente',
         oem_code: match.oem_code || undefined,
@@ -247,14 +253,22 @@ export function useProtocolState(initialEstoque: ProtocolItem[] = [], initialACo
         parker_code: match.parker_code || undefined,
         description: match.name || undefined,
         measurements: match.measurements || {},
-        markupPercent: undefined,
-        salePrice: 0,
+        markupPercent: isMisto ? 70 : undefined,
+        salePrice: isMisto ? (match.costPrice || 0) * 1.7 : 0,
       };
       setACotarItems(prev => {
         const existingIdx = prev.findIndex(i => areItemsMatching(i, quotedItem));
         if (existingIdx >= 0) {
           const updated = [...prev];
-          updated[existingIdx] = { ...updated[existingIdx], quantity: updated[existingIdx].quantity + qty };
+          const existing = updated[existingIdx];
+          updated[existingIdx] = { 
+            ...existing, 
+            quantity: existing.quantity + qty,
+            costPrice: existing.costPrice || quotedItem.costPrice,
+            unitPrice: existing.costPrice ? existing.unitPrice : quotedItem.unitPrice,
+            salePrice: existing.costPrice ? existing.salePrice : quotedItem.salePrice,
+            markupPercent: existing.costPrice ? existing.markupPercent : quotedItem.markupPercent
+          };
           return updated;
         }
         return [...prev, quotedItem];
