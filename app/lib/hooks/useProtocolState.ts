@@ -466,7 +466,7 @@ export function useProtocolState(initialEstoque: ProtocolItem[] = [], initialACo
         }
 
         let supplierType: 'Fornecedor Original' | 'Mercado Local' = 'Fornecedor Original'; // Fallback
-        if (cheapestSupplierId) {
+        if (!hasStockCost && cheapestSupplierId) {
           const sup = suppliers.find(s => String(s.id) === cheapestSupplierId);
           if (sup && (sup.type === 'Fornecedor Original' || sup.type === 'Mercado Local')) {
             supplierType = sup.type;
@@ -503,7 +503,9 @@ export function useProtocolState(initialEstoque: ProtocolItem[] = [], initialACo
         }
 
         let supplierType: 'Fornecedor Original' | 'Mercado Local' = 'Fornecedor Original'; // Fallback
-        if (cheapestSupplierId) {
+        const hasStockCost = (item.costPrice ?? 0) > 0;
+
+        if (!hasStockCost && cheapestSupplierId) {
           const sup = suppliers.find(s => String(s.id) === cheapestSupplierId);
           if (sup && (sup.type === 'Fornecedor Original' || sup.type === 'Mercado Local')) {
             supplierType = sup.type;
@@ -513,7 +515,6 @@ export function useProtocolState(initialEstoque: ProtocolItem[] = [], initialACo
         const defaultMk = getDefaultMarkup(supplierType);
         const needsApproval = numVal !== defaultMk;
         
-        const hasStockCost = (item.costPrice ?? 0) > 0;
         let baseCost = item.unitPrice ?? 0;
         if (hasStockCost) {
           baseCost = item.costPrice!;
