@@ -4,6 +4,7 @@ import type { StockProduct } from '../../../lib/types/database';
 import { filterStockByForm } from '../../../lib/services/stockService';
 import { formatMeasurement } from '../../../lib/utils/protocolFormatters';
 import { ModalCriarItem } from './ModalCriarItem';
+import { getItemIdentifier } from '../../../lib/hooks/useProtocolState';
 
 interface FormularioAdicaoItemProps {
   itemForm: ItemFormState;
@@ -299,7 +300,7 @@ export function FormularioAdicaoItem({
                   </p>
                 )}
                 {stockSearchResults.map((product) => {
-                  const identifier = product.code || product.sku || product.name;
+                  const identifier = getItemIdentifier(product);
                   const freeStock = getFreeStock(identifier, stockProducts);
                   return (
                     <div

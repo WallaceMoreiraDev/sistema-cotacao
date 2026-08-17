@@ -9,6 +9,7 @@ interface TabelaCotacaoProps {
   suppliers: SupplierRow[];
   estoqueItemsCount: number;
   updateQuantity: (id: string, qty: number) => void;
+  updateSupplierCost: (itemId: string, supplierId: string, cost: number) => void;
   removeItem: (id: string) => void;
   updateItemMarkup: (itemId: string, value: string) => void;
   handleReallocate: (id: string, maxQty: number) => void;
@@ -21,6 +22,7 @@ export function TabelaCotacao({
   suppliers,
   estoqueItemsCount,
   updateQuantity,
+  updateSupplierCost,
   removeItem,
   updateItemMarkup,
   handleReallocate,
@@ -131,8 +133,8 @@ export function TabelaCotacao({
                         <input
                           type="number"
                           placeholder="R$ 0,00"
-                          value={''}
-                          onChange={() => {}}
+                          value={item.supplierCosts?.[sup.id] || ''}
+                          onChange={(e) => updateSupplierCost(item.id, String(sup.id), parseFloat(e.target.value))}
                           className={`w-full rounded border py-1.5 px-2 text-sm text-center text-slate-900 transition-colors focus:ring-1 focus:outline-none border-slate-200`}
                         />
                       </div>
@@ -145,7 +147,16 @@ export function TabelaCotacao({
                   
                   {/* Left: Vencedor e Alertas */}
                   <div className="flex items-center gap-3">
-                    <div className="text-[11px] text-slate-400 font-medium italic">Nenhum custo informado</div>                    {canReallocate && (
+                    {item.costPrice && item.costPrice > 0 ? (
+                      <span className="text-[10px] font-bold text-amber-700 bg-amber-100 px-2 py-1 rounded flex items-center gap-1 border border-amber-200 shadow-sm" title="O custo base desta linha está usando o custo do estoque porque existem unidades em estoque. Os custos dos fornecedores serão salvos apenas para histórico.">
+                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+                        Venda travada pelo custo do estoque ({formatCurrency(item.costPrice)})
+                      </span>
+                    ) : (
+                      <div className="text-[11px] text-slate-400 font-medium italic">Sem custo base travado</div>
+                    )}
+                    
+                    {canReallocate && (
                       <button
                         type="button"
                         onClick={() => handleReallocate(item.id, freeStock)}

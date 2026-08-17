@@ -73,8 +73,7 @@ export function buildSmartDescription(params: SmartDescriptionParams): string {
   if (params.parkerOemCode) parts.push(params.parkerOemCode.toUpperCase().trim());
   
   if (params.brand && params.brand.trim() !== '') {
-    const initial = params.brand.trim().charAt(0).toUpperCase();
-    parts.push(`-${initial}`);
+    parts.push(`-${params.brand.trim().toUpperCase()}`);
   }
 
   // Remove empty spaces and join

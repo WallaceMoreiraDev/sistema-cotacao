@@ -4,8 +4,6 @@ export function createProtocol(initial: Partial<Protocol>): Protocol {
   return {
     id: initial.id ?? `proto-${Date.now()}`,
     clientName: initial.clientName ?? 'Cliente',
-    clientCnpj: initial.clientCnpj,
-    isNewClient: initial.isNewClient,
     title: initial.title ?? '',
     status: initial.status ?? 'draft',
     createdAt: initial.createdAt ?? new Date().toISOString(),

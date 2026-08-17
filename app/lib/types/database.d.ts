@@ -49,6 +49,8 @@ export interface ProtocolItem {
   unitPrice: number;
   type: 'estoque' | 'a_cotar';
   status: 'pendente' | 'aprovado' | 'reprovado' | 'reservado';
+  oem?: string;
+  nickname?: string;
   oem_code?: string;
   code?: string; // código da vedação (SKU FM)
   brand?: string;
@@ -73,14 +75,14 @@ export interface ProtocolItem {
   stockQty?: number; // qty found in stock at time of addition
   costPrice?: number; // from stock
   productId?: string; // ID from stock products for synchronization
+  // ── Supplier Costs ──
+  supplierCosts?: Record<string, number>; // Maps supplier ID to cost
 }
 
 // ─── Protocol ───
 export interface Protocol {
   id: string | number;
   clientName: string;
-  clientCnpj?: string;
-  isNewClient?: boolean;
   title?: string; // status/título do protocolo
   status: 'nao_reservado' | 'reservado' | 'finalizado' | 'cancelado';
   createdAt: string;

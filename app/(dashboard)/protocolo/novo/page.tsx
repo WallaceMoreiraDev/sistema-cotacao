@@ -30,8 +30,6 @@ export default function NewProtocolPage() {
 
   // ── Protocol header state ──
   const [clientName, setClientName] = useState('');
-  const [clientCnpj, setClientCnpj] = useState('');
-  const [isNewClient, setIsNewClient] = useState(false);
   const [protocolTitle, setProtocolTitle] = useState('');
   const protocolIdRef = useRef<string | number>(`proto-${Date.now()}`);
 
@@ -77,6 +75,7 @@ export default function NewProtocolPage() {
     splitMultipleEstoqueItems,
     removeACotarItem,
     updateACotarItemQuantity,
+    updateSupplierCost,
     updateItemMarkup,
     updateItemField,
     updateMeasurement,
@@ -86,10 +85,7 @@ export default function NewProtocolPage() {
   const allItems = [...estoqueItems, ...aCotarItems];
 
   // ── Validation ──
-  const cleanCnpjDigits = clientCnpj.replace(/\D/g, '');
-  const isFormUnlocked = isNewClient
-    ? clientName.trim().length > 0 && (cleanCnpjDigits.length === 14 || cleanCnpjDigits.length === 11)
-    : clientName.trim().length > 0;
+  const isFormUnlocked = clientName.trim().length > 0 && registeredClients.some(c => c.name.toLowerCase() === clientName.trim().toLowerCase());
 
   const isItemFormValid =
     itemForm.category?.trim().length > 0 &&
@@ -132,8 +128,6 @@ export default function NewProtocolPage() {
       const protocol = createProtocol({
         id: protocolIdRef.current,
         clientName: clientName.trim() || 'Rascunho Sem Cliente',
-        clientCnpj: clientCnpj.trim() || undefined,
-        isNewClient,
         title: protocolTitle.trim() || undefined,
         items: allItems,
         totals: { subtotal: totalsObj.subtotal, markup: totalsObj.markup, total: totalsObj.total },
@@ -149,7 +143,7 @@ export default function NewProtocolPage() {
     }, AUTOSAVE_DELAY);
 
     return () => { if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current); };
-  }, [allItems, clientName, clientCnpj, isNewClient, protocolTitle, itemForm, isFinalizing]);
+  }, [allItems, clientName, protocolTitle, itemForm, isFinalizing]);
 
 
   // ── Verification / Reallocation Modal ──
@@ -195,7 +189,6 @@ export default function NewProtocolPage() {
     
     try {
       if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
-      if (isNewClient && clientCnpj.trim()) await createClientAction({ name: clientName.trim(), cnpj: clientCnpj.trim() }).catch(console.error);
 
       const finalEstoque = forcedEstoque || estoqueItems;
       const finalACotar = forcedACotar || aCotarItems;
@@ -204,8 +197,6 @@ export default function NewProtocolPage() {
       const protocol = createProtocol({
         id: protocolIdRef.current,
         clientName: clientName.trim(),
-        clientCnpj: clientCnpj.trim() || undefined,
-        isNewClient,
         title: protocolTitle.trim() || undefined,
         items: [...finalEstoque, ...finalACotar],
         totals: { subtotal: totalsObj.subtotal, markup: totalsObj.markup, total: totalsObj.total },
@@ -223,7 +214,7 @@ export default function NewProtocolPage() {
       setIsFinalizing(false);
       isFinalizingRef.current = false;
     }
-  }, [canFinalize, clientName, clientCnpj, isNewClient, protocolTitle, estoqueItems, aCotarItems, itemForm, router]);
+  }, [canFinalize, clientName, protocolTitle, estoqueItems, aCotarItems, itemForm, router]);
 
   const handleEfetivar = useCallback(async (forcedEstoque?: ProtocolItem[], forcedACotar?: ProtocolItem[]) => {
     if (!canFinalize) return;
@@ -232,7 +223,6 @@ export default function NewProtocolPage() {
     
     try {
       if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
-      if (isNewClient && clientCnpj.trim()) await createClientAction({ name: clientName.trim(), cnpj: clientCnpj.trim() }).catch(console.error);
 
       const finalEstoque = forcedEstoque || estoqueItems;
       const finalACotar = forcedACotar || aCotarItems;
@@ -241,8 +231,6 @@ export default function NewProtocolPage() {
       const protocol = createProtocol({
         id: protocolIdRef.current,
         clientName: clientName.trim(),
-        clientCnpj: clientCnpj.trim() || undefined,
-        isNewClient,
         title: protocolTitle.trim() || undefined,
         items: [...finalEstoque, ...finalACotar],
         totals: { subtotal: totalsObj.subtotal, markup: totalsObj.markup, total: totalsObj.total },
@@ -266,7 +254,7 @@ export default function NewProtocolPage() {
       setIsFinalizing(false);
       isFinalizingRef.current = false;
     }
-  }, [canFinalize, clientName, clientCnpj, isNewClient, protocolTitle, estoqueItems, aCotarItems, router]);
+  }, [canFinalize, clientName, protocolTitle, estoqueItems, aCotarItems, router]);
 
   const handleCancelar = useCallback(() => {
     setShowCancelModal(true);
@@ -442,10 +430,6 @@ export default function NewProtocolPage() {
       <HeaderProtocolo
         clientName={clientName}
         setClientName={setClientName}
-        clientCnpj={clientCnpj}
-        setClientCnpj={setClientCnpj}
-        isNewClient={isNewClient}
-        setIsNewClient={setIsNewClient}
         registeredClients={registeredClients}
         protocolTitle={protocolTitle}
         setProtocolTitle={setProtocolTitle}
@@ -483,6 +467,7 @@ export default function NewProtocolPage() {
         suppliers={suppliers}
         estoqueItemsCount={estoqueItems.length}
         updateQuantity={updateACotarItemQuantity}
+        updateSupplierCost={updateSupplierCost}
         removeItem={removeACotarItem}
         updateItemMarkup={updateItemMarkup}
         handleReallocate={(id, qty) => handleReallocate(id, qty, stockProducts)}

@@ -5,10 +5,6 @@ import { formatCnpjMask, formatCpfMask } from '../../../lib/utils/protocolFormat
 interface HeaderProtocoloProps {
   clientName: string;
   setClientName: (name: string) => void;
-  clientCnpj: string;
-  setClientCnpj: (cnpj: string) => void;
-  isNewClient: boolean;
-  setIsNewClient: (isNew: boolean) => void;
   registeredClients: Client[];
   protocolTitle: string;
   setProtocolTitle: (title: string) => void;
@@ -21,10 +17,6 @@ interface HeaderProtocoloProps {
 export function HeaderProtocolo({
   clientName,
   setClientName,
-  clientCnpj,
-  setClientCnpj,
-  isNewClient,
-  setIsNewClient,
   registeredClients,
   protocolTitle,
   setProtocolTitle,
@@ -34,9 +26,6 @@ export function HeaderProtocolo({
   clientsLoading = false,
 }: HeaderProtocoloProps) {
   const [isClientDropdownOpen, setIsClientDropdownOpen] = useState(false);
-  const [clientType, setClientType] = useState<'pj' | 'pf'>('pj');
-
-  const cleanCnpjDigits = clientCnpj.replace(/\D/g, '');
 
   const filteredClients = useMemo(() => {
     if (!clientName.trim()) return registeredClients;
@@ -47,19 +36,12 @@ export function HeaderProtocolo({
 
   const handleSelectClient = (client: Client) => {
     setClientName(client.name);
-    setClientCnpj(client.cnpj || '');
-    setIsNewClient(false);
     setIsClientDropdownOpen(false);
   };
 
   const handleClientBlur = () => {
     setTimeout(() => {
       setIsClientDropdownOpen(false);
-      if (clientName.trim() && !registeredClients.some((c) => c.name.toLowerCase() === clientName.trim().toLowerCase())) {
-        setIsNewClient(true);
-      } else {
-        setIsNewClient(false);
-      }
     }, 200);
   };
 
@@ -115,10 +97,10 @@ export function HeaderProtocolo({
             <div className="relative">
               <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1.5 flex items-center justify-between">
                 <span>Nome do Cliente *</span>
-                {isNewClient ? (
-                  <span className="rounded-full bg-amber-500/20 text-amber-300 border border-amber-500/30 px-2 py-0.5 text-[9px]">Novo Cliente</span>
-                ) : clientName.trim() ? (
+                {clientName.trim() && registeredClients.some(c => c.name.toLowerCase() === clientName.trim().toLowerCase()) ? (
                   <span className="rounded-full bg-emerald-500/20 text-emerald-300 border border-emerald-500/30 px-2 py-0.5 text-[9px]">Cliente Cadastrado</span>
+                ) : clientName.trim() ? (
+                  <span className="rounded-full bg-red-500/20 text-red-300 border border-red-500/30 px-2 py-0.5 text-[9px]">Cliente Não Encontrado</span>
                 ) : null}
               </label>
               <div className="relative">
@@ -131,7 +113,7 @@ export function HeaderProtocolo({
                     setIsClientDropdownOpen(true);
                   }}
                   onBlur={handleClientBlur}
-                  placeholder="Digite para buscar ou cadastrar..."
+                  placeholder="Digite para buscar seu cliente..."
                   className={`w-full rounded-xl border px-4 py-2.5 text-sm font-medium text-white bg-white/5 placeholder-slate-500 outline-none transition ${
                     clientName.trim() ? 'border-slate-600 focus:border-[#F7C00C]' : 'border-amber-500/60 ring-1 ring-amber-500/20'
                   }`}
@@ -166,49 +148,12 @@ export function HeaderProtocolo({
               {!clientName.trim() && !isViewing && (
                 <p className="mt-1 text-[10px] text-amber-400">Obrigatório para liberar o formulário de itens</p>
               )}
+              {clientName.trim() && !registeredClients.some(c => c.name.toLowerCase() === clientName.trim().toLowerCase()) && !isViewing && (
+                <p className="mt-1 text-[10px] text-red-400">Este cliente não existe na base. Cadastre no Bling primeiro.</p>
+              )}
             </div>
 
-            {isNewClient ? (
-              <div>
-                <div className="flex items-center justify-between mb-1.5">
-                  <label className="block text-[11px] font-semibold uppercase tracking-wider text-amber-400">
-                    Documento do Novo Cliente *
-                  </label>
-                  <div className="flex items-center gap-2 text-[10px] bg-slate-800/50 rounded-lg p-0.5">
-                    <button 
-                      type="button"
-                      onClick={() => { setClientType('pj'); setClientCnpj(''); }}
-                      className={`px-2 py-0.5 rounded-md transition ${clientType === 'pj' ? 'bg-amber-500/20 text-amber-300' : 'text-slate-400 hover:text-slate-200'}`}
-                    >
-                      CNPJ
-                    </button>
-                    <button 
-                      type="button"
-                      onClick={() => { setClientType('pf'); setClientCnpj(''); }}
-                      className={`px-2 py-0.5 rounded-md transition ${clientType === 'pf' ? 'bg-amber-500/20 text-amber-300' : 'text-slate-400 hover:text-slate-200'}`}
-                    >
-                      CPF
-                    </button>
-                  </div>
-                </div>
-                <input
-                  type="text"
-                  value={clientCnpj}
-                  onChange={(e) => setClientCnpj(clientType === 'pj' ? formatCnpjMask(e.target.value) : formatCpfMask(e.target.value))}
-                  placeholder={clientType === 'pj' ? "00.000.000/0000-00" : "000.000.000-00"}
-                  maxLength={clientType === 'pj' ? 18 : 14}
-                  className={`w-full rounded-xl border px-4 py-2.5 text-sm font-medium text-white bg-white/5 placeholder-slate-500 outline-none transition ${
-                    (clientType === 'pj' && cleanCnpjDigits.length === 14) || (clientType === 'pf' && cleanCnpjDigits.length === 11)
-                      ? 'border-emerald-500/80 focus:border-emerald-400' 
-                      : 'border-amber-500/80 ring-1 ring-amber-500/20 focus:border-amber-400'
-                  }`}
-                />
-                {((clientType === 'pj' && cleanCnpjDigits.length < 14) || (clientType === 'pf' && cleanCnpjDigits.length < 11)) && !isViewing && (
-                  <p className="mt-1 text-[10px] text-amber-400">Preencha o {clientType === 'pj' ? 'CNPJ' : 'CPF'} completo para destravar o formulário</p>
-                )}
-              </div>
-            ) : (
-              <div>
+            <div>
                 <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1.5 flex items-center justify-between">
                   <span>Título (Opcional)</span>
                   <span className={`rounded-full border px-2 py-0.5 text-[9px] uppercase tracking-wider ${getStatusBadge(protocolStatus).className}`}>
@@ -223,7 +168,6 @@ export function HeaderProtocolo({
                   className="w-full rounded-xl border border-slate-600 bg-white/5 px-4 py-2.5 text-sm font-medium text-white placeholder-slate-500 outline-none transition focus:border-slate-400"
                 />
               </div>
-            )}
           </div>
         </fieldset>
       </div>

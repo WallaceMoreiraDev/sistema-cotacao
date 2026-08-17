@@ -36,8 +36,6 @@ export default function ProtocolDetailPage() {
 
   // ── Protocol header state ──
   const [clientName, setClientName] = useState('');
-  const [clientCnpj, setClientCnpj] = useState('');
-  const [isNewClient, setIsNewClient] = useState(false);
   const [protocolTitle, setProtocolTitle] = useState('');
   const [protocolStatus, setProtocolStatus] = useState<Protocol['status']>('nao_reservado');
   const protocolIdRef = useRef<string | number>(params?.id || `proto-${Date.now()}`);
@@ -82,6 +80,7 @@ export default function ProtocolDetailPage() {
     splitMultipleEstoqueItems,
     removeACotarItem,
     updateACotarItemQuantity,
+    updateSupplierCost,
     updateItemMarkup,
     updateItemField,
     updateMeasurement,
@@ -97,9 +96,7 @@ export default function ProtocolDetailPage() {
         if (res.success && res.data) {
           const p = res.data;
           setClientName(p.clientName);
-          if (p.clientCnpj) setClientCnpj(p.clientCnpj);
           if (p.title) setProtocolTitle(p.title);
-          setIsNewClient(p.isNewClient || false);
           if (p.id) protocolIdRef.current = p.id;
           
           if (p.status) {
@@ -133,10 +130,7 @@ export default function ProtocolDetailPage() {
   }, [params.id, setEstoqueItems, setACotarItems, setItemForm]);
 
   // ── Validation ──
-  const cleanCnpjDigits = clientCnpj.replace(/\D/g, '');
-  const isFormUnlocked = isNewClient
-    ? clientName.trim().length > 0 && cleanCnpjDigits.length === 14
-    : clientName.trim().length > 0;
+  const isFormUnlocked = clientName.trim().length > 0 && registeredClients.some(c => c.name.toLowerCase() === clientName.trim().toLowerCase());
 
   const isItemFormValid =
     itemForm.category?.trim().length > 0 &&
@@ -170,7 +164,7 @@ export default function ProtocolDetailPage() {
     if (!isProtocolLoading && !isViewing) {
       isDirtyRef.current = true;
     }
-  }, [allItems, clientName, clientCnpj, isNewClient, protocolTitle, itemForm]);
+  }, [allItems, clientName, isViewing, protocolTitle, itemForm]);
 
   useEffect(() => {
     if (isViewing || isFinalizing) return;
@@ -188,9 +182,6 @@ export default function ProtocolDetailPage() {
       const protocol = createProtocol({
         id: protocolIdRef.current,
         clientName: clientName.trim() || 'Rascunho Sem Cliente',
-        clientCnpj: clientCnpj.trim() || undefined,
-        isNewClient,
-        title: protocolTitle.trim() || undefined,
         items: allItems,
         totals: { subtotal: totalsObj.subtotal, markup: totalsObj.markup, total: totalsObj.total },
         status: protocolStatus,
@@ -206,7 +197,7 @@ export default function ProtocolDetailPage() {
     }, AUTOSAVE_DELAY);
 
     return () => { if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current); };
-  }, [allItems, clientName, clientCnpj, isNewClient, protocolTitle, isViewing, protocolStatus, itemForm, isFinalizing]);
+  }, [allItems, clientName, isViewing, protocolStatus, itemForm, isFinalizing]);
 
 
   // ── Verification / Reallocation Modal ──
@@ -253,7 +244,6 @@ export default function ProtocolDetailPage() {
     
     try {
       if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current);
-      if (isNewClient && clientCnpj.trim()) await createClientAction({ name: clientName.trim(), cnpj: clientCnpj.trim() }).catch(console.error);
 
       const finalEstoque = forcedEstoque || estoqueItems;
       const finalACotar = forcedACotar || aCotarItems;
@@ -262,9 +252,6 @@ export default function ProtocolDetailPage() {
       const protocol = createProtocol({
         id: protocolIdRef.current,
         clientName: clientName.trim(),
-        clientCnpj: clientCnpj.trim() || undefined,
-        isNewClient,
-        title: protocolTitle.trim() || undefined,
         items: [...finalEstoque, ...finalACotar],
         totals: { subtotal: totalsObj.subtotal, markup: totalsObj.markup, total: totalsObj.total },
         status: protocolStatus,
@@ -281,7 +268,7 @@ export default function ProtocolDetailPage() {
       setIsFinalizing(false);
       isFinalizingRef.current = false;
     }
-  }, [canFinalize, clientName, clientCnpj, isNewClient, protocolTitle, estoqueItems, aCotarItems, itemForm, protocolStatus]);
+  }, [canFinalize, clientName, estoqueItems, aCotarItems, itemForm, protocolStatus]);
 
   const handleReservarEstoque = useCallback(async (forcedEstoque?: ProtocolItem[], forcedACotar?: ProtocolItem[], options?: { skipDiffLog?: boolean }) => {
     if (!canFinalize) return;
@@ -385,9 +372,6 @@ export default function ProtocolDetailPage() {
     );
   }, [allItems]);
 
-  // We are removing handleEfetivar completely.
-
-
   const insufficientStockItems = useMemo(() => {
     return estoqueItems.map(item => {
       const identifier = item.code || item.oem || item.name;
@@ -428,13 +412,10 @@ export default function ProtocolDetailPage() {
     }).filter(i => i.quantity > 0);
     
     let updatedACotar = [...aCotarItems];
-    let summaryLog = '';
     
     for (const split of splits) {
       const item = estoqueItems.find(i => i.id === split.id);
       if (!item) continue;
-      
-      summaryLog += `\n- ${item.name}: mantidos ${split.maxStock} un. no estoque, enviados ${split.excessQty} un. para cotação.`;
       
       const quotedItem: ProtocolItem = {
         ...item,
@@ -475,7 +456,6 @@ export default function ProtocolDetailPage() {
   const handleConfirmRealloc = useCallback(async () => {
     const updatedEstoque = [...estoqueItems];
     let updatedACotar = [...aCotarItems];
-    let summaryLog = '';
 
     for (const { item, freeStock } of reallocatableItems) {
       const targetItem = updatedACotar.find(i => i.id === item.id);
@@ -484,8 +464,6 @@ export default function ProtocolDetailPage() {
       const currentQty = Number(targetItem.quantity);
       const qtyToMove = Math.min(currentQty, freeStock);
       
-      summaryLog += `\n- ${item.name}: ${qtyToMove} un. transferidas de Cotação para Estoque.`;
-
       const identifier = item.code || item.oem || item.name;
       const product = stockProducts.find(p => (p.code || p.sku || p.name) === identifier);
       const costPrice = product ? product.costPrice : 0;
@@ -584,10 +562,6 @@ export default function ProtocolDetailPage() {
       <HeaderProtocolo
         clientName={clientName}
         setClientName={setClientName}
-        clientCnpj={clientCnpj}
-        setClientCnpj={setClientCnpj}
-        isNewClient={isNewClient}
-        setIsNewClient={setIsNewClient}
         registeredClients={registeredClients}
         protocolTitle={protocolTitle}
         setProtocolTitle={setProtocolTitle}
@@ -629,6 +603,7 @@ export default function ProtocolDetailPage() {
         suppliers={suppliers}
         estoqueItemsCount={estoqueItems.length}
         updateQuantity={updateACotarItemQuantity}
+        updateSupplierCost={updateSupplierCost}
         removeItem={removeACotarItem}
         updateItemMarkup={updateItemMarkup}
         handleReallocate={(id, qty) => handleReallocate(id, qty, stockProducts)}

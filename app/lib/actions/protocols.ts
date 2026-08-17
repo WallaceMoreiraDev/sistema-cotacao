@@ -44,7 +44,6 @@ function mapRowsToProtocol(protoRow: any, itemRows: any[] = []): Protocol {
   return {
     id: protoRow.id,
     clientName: protoRow.client_name,
-    clientCnpj: protoRow.client_cnpj || undefined,
     title: protoRow.title || undefined,
     status: protoRow.status || 'nao_reservado',
     createdAt: protoRow.created_at || new Date().toISOString(),
@@ -153,7 +152,6 @@ export async function saveProtocolAction(protocol: Protocol, options?: { skipDif
     const isTempId = typeof protocol.id === 'string' && protocol.id.startsWith('proto-');
     const protocolPayload: any = {
       client_name: protocol.clientName,
-      client_cnpj: protocol.clientCnpj || null,
       title: protocol.title || null,
       status: protocol.status || 'nao_reservado',
       total_venda: totalVenda,
@@ -267,7 +265,7 @@ export async function saveProtocolAction(protocol: Protocol, options?: { skipDif
           cost_price: item.costPrice ?? 0,
           type: item.type ?? 'estoque',
           status: item.status ?? 'pendente',
-          oem: item.oem || null,
+          oem: item.oem_code || null,
           nickname: item.nickname || null,
           code: item.code || null,
           brand: item.brand || null,

@@ -7,6 +7,11 @@ import { findStockMatch } from '../services/stockService';
 import { getDefaultMarkup } from '../config/suppliers';
 import type { SupplierRow } from '../actions/suppliers';
 
+export function getItemIdentifier(item: any): string {
+  if (!item) return '';
+  return item.code || item.sku || item.name || '';
+}
+
 export function useProtocolState(initialEstoque: ProtocolItem[] = [], initialACotar: ProtocolItem[] = [], suppliers: SupplierRow[] = []) {
   const [estoqueItems, setEstoqueItems] = useState<ProtocolItem[]>(initialEstoque);
   const [aCotarItems, setACotarItems] = useState<ProtocolItem[]>(initialACotar);
@@ -16,12 +21,12 @@ export function useProtocolState(initialEstoque: ProtocolItem[] = [], initialACo
   const [addFeedback, setAddFeedback] = useState<string | null>(null);
 
   const getFreeStock = useCallback((identifier: string, stockProducts: StockProduct[]) => {
-    const product = stockProducts.find(p => (p.code || p.sku || p.name) === identifier);
+    const product = stockProducts.find(p => getItemIdentifier(p) === identifier);
     if (!product) return 0;
 
     let available = product.stock;
     const localConsumed = estoqueItems
-      .filter(i => (i.code || i.oem_code || i.name) === identifier)
+      .filter(i => getItemIdentifier(i) === identifier)
       .reduce((sum, i) => sum + Number(i.quantity), 0);
 
     return Math.max(0, available - localConsumed);
@@ -40,7 +45,7 @@ export function useProtocolState(initialEstoque: ProtocolItem[] = [], initialACo
     };
 
     const match = findStockMatch(stockProducts, itemForm.category, measurements, itemForm.brand);
-    const identifier = match ? (match.code || match.sku || match.name) : '';
+    const identifier = match ? getItemIdentifier(match) : '';
     const availableStock = match ? getFreeStock(identifier, stockProducts) : 0;
 
     let newCounter = itemCounter;
@@ -150,7 +155,7 @@ export function useProtocolState(initialEstoque: ProtocolItem[] = [], initialACo
 
   const handleAddStockItem = useCallback((match: StockProduct, qty: number, ignoreStock: boolean) => {
     if (qty <= 0) return;
-    const identifier = match.code || match.sku || match.name;
+    const identifier = getItemIdentifier(match);
     const availableStock = getFreeStock(identifier, [match]);
 
     let newCounter = itemCounter;
@@ -234,7 +239,7 @@ export function useProtocolState(initialEstoque: ProtocolItem[] = [], initialACo
     } else {
       newCounter++;
       const localConsumed = estoqueItems
-        .filter(i => (i.code || i.oem_code || i.name) === identifier)
+        .filter(i => getItemIdentifier(i) === identifier)
         .reduce((sum, i) => sum + Number(i.quantity), 0);
       const isMisto = localConsumed > 0 && !ignoreStock;
 
@@ -339,8 +344,8 @@ export function useProtocolState(initialEstoque: ProtocolItem[] = [], initialACo
     const currentQty = Number(targetItem.quantity);
     const qtyToMove = Math.min(currentQty, maxQty);
 
-    const identifier = targetItem.code || targetItem.oem_code || targetItem.name;
-    const product = stockProducts.find(p => (p.code || p.sku || p.name) === identifier);
+    const identifier = getItemIdentifier(targetItem);
+    const product = stockProducts.find(p => getItemIdentifier(p) === identifier);
     const costPrice = product ? product.costPrice : 0;
 
     const newEstoqueItem: ProtocolItem = {
@@ -474,8 +479,8 @@ export function useProtocolState(initialEstoque: ProtocolItem[] = [], initialACo
       let changed = false;
       const next = prev.map(cotarItem => {
         if (cotarItem.costPrice !== undefined) {
-          const identifier = cotarItem.code || cotarItem.oem_code || cotarItem.name;
-          const stillHasStock = estoqueItems.some(i => (i.code || i.oem_code || i.name) === identifier);
+          const identifier = getItemIdentifier(cotarItem);
+          const stillHasStock = estoqueItems.some(i => getItemIdentifier(i) === identifier);
           
           if (!stillHasStock) {
             changed = true;

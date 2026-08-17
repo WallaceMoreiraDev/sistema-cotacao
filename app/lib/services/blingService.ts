@@ -227,4 +227,17 @@ export class BlingService {
     const result = await response.json();
     return result.data || [];
   }
+
+  /**
+   * Fetch a single contact (client) from Bling
+   */
+  static async getContact(id: string) {
+    const response = await this.request(`/contatos/${id}`);
+    if (!response.ok) {
+      if (response.status === 404) return null;
+      throw new Error(`Falha ao buscar contato do Bling: ${response.statusText}`);
+    }
+    const result = await response.json();
+    return result.data;
+  }
 }

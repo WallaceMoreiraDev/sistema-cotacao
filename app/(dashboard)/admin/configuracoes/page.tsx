@@ -220,7 +220,7 @@ export default function SettingsPage() {
                             onClick={async () => {
                               toast.loading('Sincronizando Categorias...', { id: 'syncCat' });
                               const res = await syncBlingCategoriesAction();
-                              if (res.success) toast.success(res.message, { id: 'syncCat' });
+                              if (res.success) toast.success(res.message || 'Sucesso', { id: 'syncCat' });
                               else toast.error(res.error ? String(res.error) : 'Erro ao sincronizar', { id: 'syncCat' });
                             }}
                             className="rounded-lg bg-white border border-blue-200 px-4 py-2 text-xs font-bold text-blue-700 hover:bg-blue-50 transition-colors shadow-sm"
@@ -232,7 +232,7 @@ export default function SettingsPage() {
                             onClick={async () => {
                               toast.loading('Sincronizando Produtos...', { id: 'syncProd' });
                               const res = await syncBlingProductsAction();
-                              if (res.success) toast.success(res.message, { id: 'syncProd' });
+                              if (res.success) toast.success(res.message || 'Sucesso', { id: 'syncProd' });
                               else toast.error(res.error ? String(res.error) : 'Erro ao sincronizar', { id: 'syncProd' });
                             }}
                             className="rounded-lg bg-blue-600 border border-blue-700 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700 transition-colors shadow-sm"
@@ -244,7 +244,7 @@ export default function SettingsPage() {
                             onClick={async () => {
                               toast.loading('Sincronizando Estoques...', { id: 'syncStock' });
                               const res = await syncBlingStockAction();
-                              if (res.success) toast.success(res.message, { id: 'syncStock' });
+                              if (res.success) toast.success(res.message || 'Sucesso', { id: 'syncStock' });
                               else toast.error(res.error ? String(res.error) : 'Erro ao sincronizar', { id: 'syncStock' });
                             }}
                             className="rounded-lg bg-emerald-600 border border-emerald-700 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-700 transition-colors shadow-sm"
