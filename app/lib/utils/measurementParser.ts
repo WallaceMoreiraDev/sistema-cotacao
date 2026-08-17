@@ -82,7 +82,8 @@ export function extractBrandFromName(name: string): string | null {
 
   // Known suffixes
   if (upper.match(/- ?A$/) || upper.match(/\bAGEL\b/)) return 'Agel';
-  if (upper.match(/- ?PK$/) || upper.match(/\bPARKER\b/)) return 'Parker';
+  if (upper.match(/- ?PK$/) || upper.match(/\bPARKITS\b/)) return 'ParKits';
+  if (upper.match(/\bPARKER\b/)) return 'Parker';
   if (upper.match(/- ?L$/)) return 'L';
   if (upper.match(/- ?HBY$/) || upper.match(/\bHBY\b/)) return 'HBY';
   if (upper.match(/- ?S$/)) return 'S';
@@ -94,6 +95,28 @@ export function extractBrandFromName(name: string): string | null {
   if (upper.match(/\bCORTECO\b/)) return 'Corteco';
 
   return null;
+}
+
+/**
+ * Extracts possible category from a string
+ */
+export function extractCategoryFromName(name: string): string {
+  if (!name) return 'Desconhecida';
+  const u = name.toUpperCase();
+  if (u.includes('BUCHA') || u.includes('GUIA')) return 'Anel Guia / Fita Guia';
+  if (u.includes('ANEL') || u.includes('O-RING') || u.includes('ORING')) return 'Anel O-Ring';
+  if (u.includes('GAXETA') || u.includes('U-CUP')) return 'Gaxeta';
+  if (u.includes('RASPADOR')) return 'Raspador';
+  if (u.includes('RETENTOR')) return 'Retentor';
+  if (u.includes('CHEVRON')) return 'Jogo Chevron';
+  if (u.includes('MOLA') || u.includes('PRATO')) return 'Mola Prato';
+  if (u.includes('SELO')) return 'Selo Mecânico';
+  if (u.includes('BUFFER')) return 'Anel Buffer';
+  if (u.includes('ANTI-EXTRUSAO') || u.includes('ANTI EXTRUSAO') || u.includes('BACKUP') || u.includes('BACK-UP')) return 'Anel Anti-Extrusão';
+  if (u.includes('GOTA')) return 'Gota';
+  if (u.includes('K-DAS') || u.includes('KDAS')) return 'K-DAS';
+  if (u.includes('TIRANTE')) return 'Tirante';
+  return 'Desconhecida';
 }
 
 /**

@@ -2,7 +2,7 @@
 
 import { createClient } from '../supabase/server';
 import { BlingService } from '../services/blingService';
-import { extractMeasurementsFromName, extractPartTypeFromName, extractCodesFromName, extractBrandFromName } from '../utils/measurementParser';
+import { extractMeasurementsFromName, extractPartTypeFromName, extractCodesFromName, extractBrandFromName, extractCategoryFromName } from '../utils/measurementParser';
 import type { SealFamily, StockProduct } from '../types/database';
 
 export async function syncBlingCategoriesAction() {
@@ -97,7 +97,12 @@ export async function syncBlingProductsAction() {
       const brand = extractBrandFromName(name);
       
       const blingCatId = prod.categoria?.id?.toString();
-      const categoryName = (blingCatId && familyMap.get(blingCatId)) || 'Desconhecida';
+      let categoryName = (blingCatId && familyMap.get(blingCatId)) || 'Desconhecida';
+      
+      // Fallback: se for Desconhecida, tenta inferir pelo nome
+      if (categoryName === 'Desconhecida') {
+        categoryName = extractCategoryFromName(name);
+      }
 
       const payload: any = {
         name,
