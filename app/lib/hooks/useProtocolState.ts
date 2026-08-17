@@ -1,4 +1,4 @@
-import { useState, useCallback } from 'react';
+import { useState, useCallback, useEffect } from 'react';
 import type { ProtocolItem, StockProduct } from '../types/database';
 import { areItemsMatching, formatMeasurement } from '../utils/protocolFormatters';
 import { buildSmartDescription, generateFMCode } from '../utils/productNameBuilder';
@@ -467,6 +467,57 @@ export function useProtocolState(initialEstoque: ProtocolItem[] = [], initialACo
       }).filter(i => i.quantity > 0);
     });
   }, [estoqueItems]);
+
+  // Sincroniza o destravamento caso os itens do estoque sejam apagados
+  useEffect(() => {
+    setACotarItems(prev => {
+      let changed = false;
+      const next = prev.map(cotarItem => {
+        if (cotarItem.costPrice !== undefined) {
+          const identifier = cotarItem.code || cotarItem.oem_code || cotarItem.name;
+          const stillHasStock = estoqueItems.some(i => (i.code || i.oem_code || i.name) === identifier);
+          
+          if (!stillHasStock) {
+            changed = true;
+            
+            const newCosts = { ...(cotarItem.supplierCosts || {}) };
+            const validEntries = Object.entries(newCosts).filter(([_, v]) => v > 0);
+            let cheapestSupplierId: string | null = null;
+            let baseCost = 0;
+            
+            if (validEntries.length > 0) {
+              const cheapest = validEntries.reduce((min, current) => current[1] < min[1] ? current : min);
+              cheapestSupplierId = cheapest[0];
+              baseCost = cheapest[1];
+            }
+
+            let supplierType: 'Fornecedor Original' | 'Mercado Local' = 'Fornecedor Original';
+            if (cheapestSupplierId) {
+              const sup = suppliers.find(s => String(s.id) === cheapestSupplierId);
+              if (sup && (sup.type === 'Fornecedor Original' || sup.type === 'Mercado Local')) {
+                supplierType = sup.type;
+              }
+            }
+
+            const defaultMk = getDefaultMarkup(supplierType);
+            const mk = !cotarItem.isMarkupDirty ? defaultMk : (cotarItem.markupPercent ?? defaultMk);
+            const salePrice = baseCost * (1 + mk / 100);
+
+            return {
+              ...cotarItem,
+              costPrice: undefined, // Destrava o item
+              unitPrice: baseCost,
+              salePrice,
+              markupPercent: mk,
+              needsApproval: mk !== defaultMk
+            };
+          }
+        }
+        return cotarItem;
+      });
+      return changed ? next : prev;
+    });
+  }, [estoqueItems, suppliers]);
 
   const removeACotarItem = useCallback((id: string) => {
     setACotarItems(prev => prev.filter(i => i.id !== id));
