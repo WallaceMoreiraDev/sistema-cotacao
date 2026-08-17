@@ -162,7 +162,7 @@ export function useProtocolState(initialEstoque: ProtocolItem[] = [], initialACo
       newCounter++;
       const stockItem: ProtocolItem = {
         id: `item-${Date.now()}-e`,
-        name: match.category || match.name || 'N/A',
+        name: match.name || match.category || 'N/A',
         quantity: stockQty,
         unitPrice: match.costPrice,
         costPrice: match.costPrice,
@@ -194,7 +194,7 @@ export function useProtocolState(initialEstoque: ProtocolItem[] = [], initialACo
         newCounter++;
         const quotedItem: ProtocolItem = {
           id: `item-${Date.now()}-c`,
-          name: match.category || match.name || 'N/A',
+          name: match.name || match.category || 'N/A',
           quantity: remainQty,
           costPrice: match.costPrice,
           type: 'a_cotar',
@@ -240,7 +240,7 @@ export function useProtocolState(initialEstoque: ProtocolItem[] = [], initialACo
 
       const quotedItem: ProtocolItem = {
         id: `item-${Date.now()}-c`,
-        name: match.category || match.name || 'N/A',
+        name: match.name || match.category || 'N/A',
         quantity: qty,
         unitPrice: isMisto ? (match.costPrice || 0) : 0,
         costPrice: isMisto ? match.costPrice : undefined,
