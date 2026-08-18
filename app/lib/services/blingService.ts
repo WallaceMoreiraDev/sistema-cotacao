@@ -210,7 +210,40 @@ export class BlingService {
   }
 
   /**
-   * Fetch stock balances from Bling (/estoques/saldos) for specific products
+   * Fetch a single product by ID
+   */
+  static async getProduct(id: string | number) {
+    const response = await this.request(`/produtos/${id}`);
+    if (!response.ok) return null;
+    const result = await response.json();
+    return result.data;
+  }
+
+  /**
+   * Fetch a single category by ID
+   */
+  static async getCategory(id: string | number) {
+    const response = await this.request(`/categorias/produtos/${id}`);
+    if (!response.ok) return null;
+    const result = await response.json();
+    return result.data;
+  }
+
+  /**
+   * Fetch stock balance for a single product ID
+   */
+  static async getStockBalance(produtoId: string | number) {
+    const response = await this.request(`/estoques/saldos?idsProdutos[]=${produtoId}`);
+    if (!response.ok) return null;
+    const result = await response.json();
+    if (result.data && result.data.length > 0) {
+      return result.data[0];
+    }
+    return null;
+  }
+
+  /**
+   * Fetch stock balances for multiple product IDs
    */
   static async getStockBalancesForProducts(productIds: string[]) {
     if (!productIds || productIds.length === 0) return [];
