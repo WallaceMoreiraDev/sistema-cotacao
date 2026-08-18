@@ -115,7 +115,22 @@ async function processProductWebhook(blingId: string | number) {
   try {
     console.log(`Buscando produto ${blingId} na API do Bling...`);
     const product = await BlingService.getProduct(blingId.toString());
-    if (!product) return;
+    
+    // Se o Bling retornar 404 (não encontrou), assumimos que foi excluído fisicamente
+    if (!product) {
+      console.log(`Produto ${blingId} não encontrado na API do Bling. Tentando excluir do banco local...`);
+      await processProductDeletedWebhook(blingId);
+      return;
+    }
+
+    // O Bling usa "Soft Delete" (situacao: "E") quando o usuário clica em apagar.
+    // Também podemos ignorar ou ocultar os inativos (situacao: "I") se desejado, 
+    // mas "E" definitivamente deve ser deletado.
+    if (product.situacao === 'E') {
+      console.log(`Produto ${blingId} está com situação Excluído (E) no Bling. Excluindo do banco local...`);
+      await processProductDeletedWebhook(blingId);
+      return;
+    }
 
     // Use Service Role to bypass RLS
     const { createClient: createSupabaseClient } = require('@supabase/supabase-js');
