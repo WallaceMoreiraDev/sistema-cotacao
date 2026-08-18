@@ -261,7 +261,6 @@ export async function syncBlingContactsAction() {
         name,
         cnpj,
         bling_id: blingId,
-        updated_at: new Date().toISOString()
       };
 
       const existingId = existingMap.get(blingId);
@@ -269,7 +268,6 @@ export async function syncBlingContactsAction() {
         payload.id = existingId;
         updatedCount++;
       } else {
-        payload.created_at = new Date().toISOString();
         createdCount++;
       }
       upsertBatch.push(payload);
