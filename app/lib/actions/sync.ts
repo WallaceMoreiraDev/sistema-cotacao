@@ -244,10 +244,15 @@ export async function syncBlingContactsAction() {
     let updatedCount = 0;
 
     // Fetch existing clients to map
-    const { data: existingClients } = await supabase.from('clients').select('id, bling_id').not('bling_id', 'is', null);
-    const existingMap = new Map();
+    const { data: existingClients } = await supabase.from('clients').select('id, bling_id, name');
+    const existingMapByBlingId = new Map();
+    const existingMapByName = new Map();
+    
     if (existingClients) {
-      existingClients.forEach(c => existingMap.set(c.bling_id.toString(), c.id));
+      existingClients.forEach(c => {
+        if (c.bling_id) existingMapByBlingId.set(c.bling_id.toString(), c.id);
+        if (c.name) existingMapByName.set(c.name.trim().toLowerCase(), c.id);
+      });
     }
 
     const upsertBatch = [];
@@ -263,7 +268,7 @@ export async function syncBlingContactsAction() {
         bling_id: blingId,
       };
 
-      const existingId = existingMap.get(blingId);
+      const existingId = existingMapByBlingId.get(blingId) || existingMapByName.get(name.trim().toLowerCase());
       if (existingId) {
         payload.id = existingId;
         updatedCount++;
