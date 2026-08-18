@@ -30,20 +30,22 @@ export async function POST(req: Request) {
 
       console.log(`Processando evento ${eventName} para ID ${blingId}`);
 
-      if (eventName === 'contacts.created' || eventName === 'contacts.updated') {
+      if (eventName === 'contact.created' || eventName === 'contact.updated' || eventName === 'contacts.created' || eventName === 'contacts.updated') {
         await processContactWebhook(blingId);
-      } else if (eventName === 'products.created' || eventName === 'products.updated') {
+      } else if (eventName === 'product.created' || eventName === 'product.updated' || eventName === 'products.created' || eventName === 'products.updated') {
         await processProductWebhook(blingId);
-      } else if (eventName === 'categories.created' || eventName === 'categories.updated') {
+      } else if (eventName === 'category.created' || eventName === 'category.updated' || eventName === 'categories.created' || eventName === 'categories.updated') {
         await processCategoryWebhook(blingId);
-      } else if (eventName === 'stocks.updated' || eventName === 'products.stocks.updated') {
+      } else if (eventName === 'stock.updated' || eventName === 'stocks.updated' || eventName === 'product.stock.updated' || eventName === 'products.stocks.updated') {
         // Stock event could pass product ID in evt.produto.id
         const productId = evt.produto?.id || blingId;
         await processStockWebhook(productId);
-      } else if (eventName === 'product_supplier.created') {
+      } else if (eventName === 'product_supplier.created' || eventName === 'product_supplier.updated') {
         // Fornecedor vinculado ao produto. Atualizar produto/estoque.
         const productId = evt.produto?.id || blingId;
         await processProductWebhook(productId);
+      } else {
+        console.log(`Evento ${eventName} ignorado (sem handler mapeado).`);
       }
     }
 
