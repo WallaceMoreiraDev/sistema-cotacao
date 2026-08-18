@@ -66,7 +66,13 @@ export function useProtocolRealtime(protocolId?: number) {
       })
       .subscribe();
 
-
+    // Load initial static data
+    getClientsAction().then(res => { 
+      if (!cancelled && res.success && res.data) {
+        setRegisteredClients(res.data); 
+      }
+      if (!cancelled) setClientsLoading(false);
+    });
 
     return () => { 
       cancelled = true; 

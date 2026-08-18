@@ -2,12 +2,18 @@ import { NextResponse } from 'next/server';
 import { BlingService } from '../../../lib/services/blingService';
 import { createClient } from '../../../lib/supabase/server';
 
+export async function GET(req: Request) {
+  console.log('Webhook Bling (GET) Teste recebido com sucesso no terminal!');
+  return NextResponse.json({ success: true, message: 'O túnel está funcionando! O Next.js recebeu a requisição.' });
+}
+
 export async function POST(req: Request) {
   try {
     const body = await req.json();
     console.log('Webhook Bling Recebido:', JSON.stringify(body, null, 2));
 
     const data = body.data;
+    console.log('Dados extraídos:', data);
     if (!data) return NextResponse.json({ success: true, message: 'Nenhum dado encontrado no payload.' });
 
     const eventos = Array.isArray(data) ? data : [data];
@@ -17,7 +23,12 @@ export async function POST(req: Request) {
       const tipo = evt.tipo || evt.module; // Evitando problemas de nomenclatura
       const blingId = evt.id;
 
-      if (!blingId) continue;
+      if (!blingId) {
+         console.log('ID do Bling não encontrado no evento:', evt);
+         continue;
+      }
+
+      console.log(`Processando evento do tipo ${tipo} para ID ${blingId}`);
 
       if (tipo === 'contatos') {
         await processContactWebhook(blingId);
@@ -35,11 +46,14 @@ export async function POST(req: Request) {
 
 async function processContactWebhook(blingId: string | number) {
   try {
+    console.log(`Buscando contato ${blingId} na API do Bling...`);
     const contact = await BlingService.getContact(blingId.toString());
     if (!contact) {
       console.log(`Contato ${blingId} não encontrado no Bling (pode ter sido excluído).`);
       return;
     }
+
+    console.log(`Contato encontrado: ${contact.nome}`);
 
     // Se o contato for excluído, o status é 'E'
     if (contact.situacao === 'E') {
@@ -47,7 +61,12 @@ async function processContactWebhook(blingId: string | number) {
       return;
     }
 
-    const supabase = await createClient();
+    // Usar a Service Role Key para ignorar RLS
+    const { createClient: createSupabaseClient } = require('@supabase/supabase-js');
+    const supabase = createSupabaseClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY! || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+    );
     
     const nome = contact.nome;
     const cnpj_cpf = contact.numeroDocumento || '';

@@ -4,6 +4,8 @@ import { AuthProvider } from "./context/AuthContext";
 import { Toaster } from "react-hot-toast";
 import "./globals.css";
 
+export const dynamic = 'force-dynamic';
+
 const geistSans = Geist({
   variable: "--font-geist-sans",
   subsets: ["latin"],

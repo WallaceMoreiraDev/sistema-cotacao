@@ -39,7 +39,8 @@ export async function updateSession(request: NextRequest) {
     !user &&
     !isAuthRoute &&
     !request.nextUrl.pathname.startsWith('/_next') &&
-    !request.nextUrl.pathname.startsWith('/favicon.ico')
+    !request.nextUrl.pathname.startsWith('/favicon.ico') &&
+    !request.nextUrl.pathname.startsWith('/api/webhooks')
   ) {
     // If no user and trying to access protected route, redirect to login
     const url = request.nextUrl.clone();
