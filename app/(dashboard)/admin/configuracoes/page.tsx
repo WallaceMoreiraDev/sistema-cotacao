@@ -6,6 +6,7 @@ import {
   syncBlingCategoriesAction,
   syncBlingProductsAction,
   syncBlingStockAction,
+  syncBlingContactsAction,
 } from '../../../lib/actions/sync';
 import type { SystemSettings } from '../../../lib/types/database';
 import toast from 'react-hot-toast';
@@ -250,6 +251,18 @@ export default function SettingsPage() {
                             className="rounded-lg bg-emerald-600 border border-emerald-700 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-700 transition-colors shadow-sm"
                           >
                             Sincronizar Estoque Físico
+                          </button>
+                          <button
+                            type="button"
+                            onClick={async () => {
+                              toast.loading('Sincronizando Clientes...', { id: 'syncContacts' });
+                              const res = await syncBlingContactsAction();
+                              if (res.success) toast.success(res.message || 'Sucesso', { id: 'syncContacts' });
+                              else toast.error(res.error ? String(res.error) : 'Erro ao sincronizar', { id: 'syncContacts' });
+                            }}
+                            className="rounded-lg bg-purple-600 border border-purple-700 px-4 py-2 text-xs font-bold text-white hover:bg-purple-700 transition-colors shadow-sm"
+                          >
+                            Puxar Clientes
                           </button>
                         </div>
                       )}

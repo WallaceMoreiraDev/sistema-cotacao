@@ -231,3 +231,65 @@ export async function syncBlingStockAction() {
     return { success: false, error: err.message };
   }
 }
+
+export async function syncBlingContactsAction() {
+  try {
+    const contacts = await BlingService.getAllContacts();
+    if (!contacts || contacts.length === 0) {
+      return { success: true, message: 'Nenhum contato encontrado no Bling.' };
+    }
+
+    const supabase = await createClient();
+    let createdCount = 0;
+    let updatedCount = 0;
+
+    // Fetch existing clients to map
+    const { data: existingClients } = await supabase.from('clients').select('id, bling_id').not('bling_id', 'is', null);
+    const existingMap = new Map();
+    if (existingClients) {
+      existingClients.forEach(c => existingMap.set(c.bling_id.toString(), c.id));
+    }
+
+    const upsertBatch = [];
+
+    for (const contact of contacts) {
+      const blingId = contact.id.toString();
+      const name = contact.nome;
+      const cnpj = contact.numeroDocumento || '';
+
+      const payload: any = {
+        name,
+        cnpj,
+        bling_id: blingId,
+        updated_at: new Date().toISOString()
+      };
+
+      const existingId = existingMap.get(blingId);
+      if (existingId) {
+        payload.id = existingId;
+        updatedCount++;
+      } else {
+        payload.created_at = new Date().toISOString();
+        createdCount++;
+      }
+      upsertBatch.push(payload);
+    }
+
+    const chunkSize = 1000;
+    for (let i = 0; i < upsertBatch.length; i += chunkSize) {
+      const chunk = upsertBatch.slice(i, i + chunkSize);
+      const { error } = await supabase.from('clients').upsert(chunk, { onConflict: 'id' });
+      if (error) console.error('Error during bulk clients upsert:', error);
+    }
+
+    await supabase.from('import_logs').insert([{
+      original_name: 'Sincronização de Clientes (Contatos)',
+      reason: `Criados: ${createdCount}, Atualizados: ${updatedCount}`
+    }]);
+
+    return { success: true, message: `Clientes sincronizados. ${createdCount} novos, ${updatedCount} atualizados.` };
+  } catch (err: any) {
+    console.error('syncBlingContactsAction error:', err);
+    return { success: false, error: err.message };
+  }
+}

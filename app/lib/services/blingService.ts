@@ -273,4 +273,33 @@ export class BlingService {
     const result = await response.json();
     return result.data;
   }
+
+  /**
+   * Fetch all contacts (clients/suppliers) from Bling
+   */
+  static async getAllContacts() {
+    let allContacts: any[] = [];
+    let page = 1;
+    let hasMore = true;
+
+    while (hasMore) {
+      const response = await this.request(`/contatos?pagina=${page}&limite=100`);
+      if (!response.ok) {
+        throw new Error('Falha ao buscar contatos do Bling');
+      }
+      const result = await response.json();
+      const data = result.data || [];
+      
+      allContacts = allContacts.concat(data);
+
+      if (data.length < 100) {
+        hasMore = false;
+      } else {
+        page++;
+        await new Promise(res => setTimeout(res, 333));
+      }
+    }
+
+    return allContacts;
+  }
 }
