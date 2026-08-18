@@ -177,7 +177,7 @@ async function processProductDeletedWebhook(blingId: string | number) {
     const { createClient: createSupabaseClient } = require('@supabase/supabase-js');
     const supabase = createSupabaseClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY! || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
 
-    const { error } = await supabase.from('stock_products').delete().eq('bling_id', blingId);
+    const { error } = await supabase.from('stock_products').delete().eq('bling_id', blingId.toString());
     if (!error) {
       console.log(`Produto excluído com sucesso via Webhook (Bling ID: ${blingId})`);
     } else {
