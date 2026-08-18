@@ -34,6 +34,8 @@ export async function POST(req: Request) {
         await processContactWebhook(blingId);
       } else if (eventName === 'product.created' || eventName === 'product.updated' || eventName === 'products.created' || eventName === 'products.updated') {
         await processProductWebhook(blingId);
+      } else if (eventName === 'product.deleted' || eventName === 'products.deleted') {
+        await processProductDeletedWebhook(blingId);
       } else if (eventName === 'category.created' || eventName === 'category.updated' || eventName === 'categories.created' || eventName === 'categories.updated') {
         await processCategoryWebhook(blingId);
       } else if (eventName === 'stock.updated' || eventName === 'stocks.updated' || eventName === 'product.stock.updated' || eventName === 'products.stocks.updated') {
@@ -167,6 +169,22 @@ async function processProductWebhook(blingId: string | number) {
     }
   } catch (err: any) {
     console.error(`Erro ao processar produto ${blingId}:`, err.message);
+  }
+}
+
+async function processProductDeletedWebhook(blingId: string | number) {
+  try {
+    const { createClient: createSupabaseClient } = require('@supabase/supabase-js');
+    const supabase = createSupabaseClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY! || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
+
+    const { error } = await supabase.from('stock_products').delete().eq('bling_id', blingId);
+    if (!error) {
+      console.log(`Produto excluído com sucesso via Webhook (Bling ID: ${blingId})`);
+    } else {
+      console.error(`Falha ao excluir produto (Bling ID: ${blingId}):`, error.message);
+    }
+  } catch (err: any) {
+    console.error(`Erro ao processar exclusão de produto ${blingId}:`, err.message);
   }
 }
 
