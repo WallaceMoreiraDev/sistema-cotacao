@@ -156,12 +156,24 @@ async function processProductWebhook(blingId: string | number) {
     if (categoryName === 'Desconhecida') {
       categoryName = extractCategoryFromName(name);
     }
+    
+    // Buscar estoque inicial (pois se o usuário colocou estoque na tela de criação, o bling não manda webhook de estoque separado)
+    let currentStock = 0;
+    try {
+      const balance = await BlingService.getStockBalance(blingId.toString());
+      if (balance) {
+        currentStock = balance.saldoFisicoTotal || 0;
+      }
+    } catch (e) {
+      // Ignora erro se não tiver saldo ainda
+    }
 
     const payload: any = {
       name,
       sku: code,
       code,
       cost_price: price,
+      stock: currentStock,
       bling_id: blingId.toString(),
       category: categoryName,
       part_type: partType || null,
