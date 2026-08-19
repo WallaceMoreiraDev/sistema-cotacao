@@ -20,8 +20,8 @@ export async function POST(req: Request) {
     const eventos = Array.isArray(data) ? data : [data];
 
     for (const evt of eventos) {
-      // In V3, the ID is in evt.id or evt.retorno?.id depending on the endpoint, usually evt.id
-      const blingId = evt.id || (evt.retorno && evt.retorno.id);
+      // In V3, the ID is in evt.id, evt.retorno?.id, or evt.produto?.id depending on the endpoint
+      const blingId = evt.id || (evt.retorno && evt.retorno.id) || (evt.produto && evt.produto.id);
 
       if (!blingId) {
          console.log('ID do Bling não encontrado no evento:', evt);
@@ -38,7 +38,7 @@ export async function POST(req: Request) {
         await processProductDeletedWebhook(blingId);
       } else if (eventName === 'category.created' || eventName === 'category.updated' || eventName === 'categories.created' || eventName === 'categories.updated') {
         await processCategoryWebhook(blingId);
-      } else if (eventName === 'stock.updated' || eventName === 'stocks.updated' || eventName === 'product.stock.updated' || eventName === 'products.stocks.updated') {
+      } else if (eventName === 'stock.created' || eventName === 'stock.updated' || eventName === 'stocks.created' || eventName === 'stocks.updated' || eventName === 'product.stock.updated' || eventName === 'products.stocks.updated') {
         // Stock event could pass product ID in evt.produto.id
         const productId = evt.produto?.id || blingId;
         await processStockWebhook(productId);
@@ -160,6 +160,8 @@ async function processProductWebhook(blingId: string | number) {
     // Buscar estoque inicial (pois se o usuário colocou estoque na tela de criação, o bling não manda webhook de estoque separado)
     let currentStock = 0;
     try {
+      // Pequeno delay para garantir que o Bling processou o estoque inicial no banco deles antes da nossa requisição
+      await new Promise(resolve => setTimeout(resolve, 1500));
       const balance = await BlingService.getStockBalance(blingId.toString());
       if (balance) {
         currentStock = balance.saldoFisicoTotal || 0;
