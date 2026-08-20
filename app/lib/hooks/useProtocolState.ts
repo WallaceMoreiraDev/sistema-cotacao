@@ -505,7 +505,7 @@ export function useProtocolState(initialEstoque: ProtocolItem[] = [], initialACo
             }
 
             const defaultMk = getDefaultMarkup(supplierType);
-            const mk = !cotarItem.isMarkupDirty ? defaultMk : (cotarItem.markupPercent ?? defaultMk);
+            const mk = cotarItem.markupPercent !== undefined && cotarItem.markupPercent !== null ? cotarItem.markupPercent : defaultMk;
             const salePrice = baseCost * (1 + mk / 100);
 
             return {
@@ -514,7 +514,7 @@ export function useProtocolState(initialEstoque: ProtocolItem[] = [], initialACo
               unitPrice: baseCost,
               salePrice,
               markupPercent: mk,
-              needsApproval: mk !== defaultMk
+              needsApproval: mk < defaultMk
             };
           }
         }
@@ -565,7 +565,7 @@ export function useProtocolState(initialEstoque: ProtocolItem[] = [], initialACo
         }
 
         const defaultMk = getDefaultMarkup(supplierType);
-        const mk = !item.isMarkupDirty ? defaultMk : (item.markupPercent ?? defaultMk);
+        const mk = item.markupPercent !== undefined && item.markupPercent !== null ? item.markupPercent : defaultMk;
         const salePrice = baseCost * (1 + mk / 100);
 
         return { 
@@ -606,7 +606,7 @@ export function useProtocolState(initialEstoque: ProtocolItem[] = [], initialACo
 
         const defaultMk = getDefaultMarkup(supplierType);
         const numVal = isReset ? defaultMk : (parseFloat(value) || 0);
-        const needsApproval = numVal !== defaultMk;
+        const needsApproval = numVal < defaultMk;
         
         let baseCost = item.unitPrice ?? 0;
         if (hasStockCost) {
@@ -617,10 +617,12 @@ export function useProtocolState(initialEstoque: ProtocolItem[] = [], initialACo
 
         let approvalStatus = item.approvalStatus;
         if (numVal !== item.markupPercent) {
-          approvalStatus = 'pending';
+          approvalStatus = needsApproval ? 'pending' : 'approved';
         }
 
-        const isMarkupDirty = !isReset && needsApproval;
+        // The user manually triggered this function by typing or clearing the input,
+        // so the field is dirty and the server should save whatever value we computed.
+        const isMarkupDirty = true;
 
         return { ...item, markupPercent: numVal, salePrice, unitPrice: baseCost, needsApproval, approvalStatus, isMarkupDirty };
       })

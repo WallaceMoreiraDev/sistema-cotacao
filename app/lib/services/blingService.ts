@@ -374,4 +374,23 @@ export class BlingService {
     const result = await response.json();
     return result.data;
   }
+
+  /**
+   * Fetch all Categories from Bling
+   */
+  static async getCategories() {
+    // Bling V3 pagination is handled via query params (pagina, limite)
+    // For simplicity, we'll fetch up to 100 on the first page, which usually covers all families.
+    const response = await this.request('/categorias/produtos?limite=100', {
+      method: 'GET'
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`Falha ao buscar categorias no Bling: ${response.status} - ${errText}`);
+    }
+
+    const result = await response.json();
+    return result.data; // Array of categories
+  }
 }

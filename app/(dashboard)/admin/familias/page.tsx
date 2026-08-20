@@ -1,13 +1,14 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { getSealFamiliesAction, createSealFamilyAction, updateSealFamilyAction, deleteSealFamilyAction } from '../../../lib/actions/admin';
+import { getSealFamiliesAction, createSealFamilyAction, updateSealFamilyAction, deleteSealFamilyAction, syncSealFamiliesFromBlingAction } from '../../../lib/actions/admin';
 import type { SealFamily } from '../../../lib/types/database';
 import toast from 'react-hot-toast';
 
 export default function FamiliesPage() {
   const [families, setFamilies] = useState<SealFamily[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [isSyncing, setIsSyncing] = useState(false);
   
   const [isAdding, setIsAdding] = useState(false);
   const [editingId, setEditingId] = useState<string | number | null>(null);
@@ -38,6 +39,24 @@ export default function FamiliesPage() {
     setIsAdding(false);
     setEditingId(null);
     setName('');
+  };
+
+  const handleSync = async () => {
+    setIsSyncing(true);
+    const toastId = toast.loading('Sincronizando com o Bling...');
+    try {
+      const res = await syncSealFamiliesFromBlingAction();
+      if (res.success) {
+        toast.success(res.message || 'Sincronizado com sucesso!', { id: toastId });
+        loadFamilies(); // recarrega a tabela
+      } else {
+        toast.error(`Falha ao sincronizar: ${res.error}`, { id: toastId });
+      }
+    } catch (err: any) {
+      toast.error('Erro de conexão ao sincronizar', { id: toastId });
+    } finally {
+      setIsSyncing(false);
+    }
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -113,6 +132,18 @@ export default function FamiliesPage() {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
                 </svg>
               </div>
+              <button
+                onClick={handleSync}
+                disabled={isSyncing}
+                className="inline-flex shrink-0 items-center gap-2 rounded-2xl bg-amber-50 px-6 py-3 text-sm font-bold text-amber-600 border border-amber-200 shadow-sm transition-all hover:bg-amber-100 hover:-translate-y-0.5 focus:ring-2 focus:ring-amber-500 focus:ring-offset-2 whitespace-nowrap disabled:opacity-70 disabled:cursor-not-allowed"
+                title="Puxar todas as categorias do Bling"
+              >
+                <svg className={`h-5 w-5 ${isSyncing ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                {isSyncing ? 'Sincronizando...' : 'Sincronizar Bling'}
+              </button>
+              
               <button
                 onClick={() => setIsAdding(true)}
                 className="inline-flex shrink-0 items-center gap-2 rounded-2xl bg-slate-900 px-6 py-3 text-sm font-bold text-white shadow-xl shadow-slate-900/20 transition-all hover:bg-slate-800 hover:-translate-y-0.5 focus:ring-2 focus:ring-slate-900 focus:ring-offset-2 whitespace-nowrap"

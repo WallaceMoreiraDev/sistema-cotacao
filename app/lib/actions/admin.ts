@@ -205,4 +205,71 @@ export async function deleteSealFamilyAction(id: string | number) {
   }
 }
 
+export async function syncSealFamiliesFromBlingAction() {
+  try {
+    const { BlingService } = await import('../services/blingService');
+    const supabase = await createClient();
+    
+    // Fetch categories from Bling
+    const blingCategories = await BlingService.getCategories();
+    if (!blingCategories || !Array.isArray(blingCategories)) {
+      throw new Error('Formato inválido retornado pelo Bling');
+    }
+    
+    // Fetch local families to compare
+    const { data: localFamilies } = await supabase.from('seal_families').select('*');
+    const localMap = new Map((localFamilies || []).map(f => [f.bling_id, f]));
+    
+    let added = 0;
+    let updated = 0;
+    let deleted = 0;
+
+    const blingIdsSet = new Set(blingCategories.map((c: any) => c.id).filter(Boolean));
+
+    for (const bCat of blingCategories) {
+      if (!bCat.id) continue;
+      
+      const existing = localMap.get(bCat.id);
+      
+      if (existing) {
+        // Update if name changed
+        if (existing.name !== bCat.descricao) {
+          await supabase.from('seal_families').update({ name: bCat.descricao }).eq('id', existing.id);
+          updated++;
+        }
+      } else {
+        // Add new
+        // Also check if there's a family with the exact same name but no bling_id (to link them)
+        const matchByName = (localFamilies || []).find(f => f.name.toLowerCase() === bCat.descricao.toLowerCase() && !f.bling_id);
+        if (matchByName) {
+          await supabase.from('seal_families').update({ bling_id: bCat.id }).eq('id', matchByName.id);
+          updated++;
+        } else {
+          await supabase.from('seal_families').insert([{ name: bCat.descricao, bling_id: bCat.id }]);
+          added++;
+        }
+      }
+    }
+
+    // Identify and delete local families that have a bling_id but are no longer in Bling
+    for (const local of (localFamilies || [])) {
+      if (local.bling_id && !blingIdsSet.has(local.bling_id)) {
+        // It was deleted in Bling
+        const { error: delErr } = await supabase.from('seal_families').delete().eq('id', local.id);
+        if (!delErr) {
+          deleted++;
+        } else {
+          // If it fails to delete (likely due to foreign key constraints), we just unlink it from Bling
+          await supabase.from('seal_families').update({ bling_id: null }).eq('id', local.id);
+        }
+      }
+    }
+
+    return { success: true, message: `Sincronização concluída! ${added} adicionadas, ${updated} atualizadas, ${deleted} removidas.` };
+  } catch (err: any) {
+    console.error('Error syncing from Bling:', err);
+    return { success: false, error: err.message };
+  }
+}
+
 
