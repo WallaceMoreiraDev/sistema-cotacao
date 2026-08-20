@@ -97,9 +97,11 @@ export function FooterAcoes({
                     Enviar para Bling
                   </button>
                   {!canSendToBling && (
-                    <div className="absolute bottom-full right-0 mb-2 hidden group-hover:block z-20 w-48">
+                    <div className="absolute bottom-full right-0 mb-2 hidden group-hover:block z-20 w-56">
                       <div className="rounded-lg bg-slate-900 px-3 py-2 text-[10px] text-white shadow-lg text-center">
-                        Resolva pendências de preço e aprovação antes de enviar.
+                        {protocolStatus === 'nao_reservado'
+                          ? 'Reserve o estoque primeiro antes de enviar para o Bling.'
+                          : 'Resolva pendências de preço e aprovação antes de enviar.'}
                         <div className="absolute bottom-0 right-4 translate-y-1/2 rotate-45 h-2 w-2 bg-slate-900" />
                       </div>
                     </div>

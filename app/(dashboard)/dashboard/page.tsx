@@ -38,10 +38,7 @@ export default function DashboardPage() {
     return String(id);
   };
 
-  // Format currency
-  const formatCurrency = (amount: number) => {
-    return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(amount);
-  };
+
 
   // Format date
   const formatDate = (dateStr: string) => {

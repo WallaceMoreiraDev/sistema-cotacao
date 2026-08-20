@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { BlingService } from '../../../lib/services/blingService';
 import { createClient } from '../../../lib/supabase/server';
+import { createAdminClient } from '../../../lib/supabase/admin';
 
 export async function GET(req: Request) {
   console.log('Webhook Bling (GET) Teste recebido com sucesso no terminal!');
@@ -77,11 +78,7 @@ async function processContactWebhook(blingId: string | number) {
     }
 
     // Usar a Service Role Key para ignorar RLS
-    const { createClient: createSupabaseClient } = require('@supabase/supabase-js');
-    const supabase = createSupabaseClient(
-      process.env.NEXT_PUBLIC_SUPABASE_URL!,
-      process.env.SUPABASE_SERVICE_ROLE_KEY! || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    );
+    const supabase = createAdminClient();
     
     const nome = contact.nome;
     const cnpj_cpf = contact.numeroDocumento || '';
@@ -133,8 +130,7 @@ async function processProductWebhook(blingId: string | number) {
     }
 
     // Use Service Role to bypass RLS
-    const { createClient: createSupabaseClient } = require('@supabase/supabase-js');
-    const supabase = createSupabaseClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY! || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
+    const supabase = createAdminClient();
 
     // Extract measurements from name using our util
     const { extractMeasurementsFromName, extractPartTypeFromName, extractCodesFromName, extractBrandFromName, extractCategoryFromName } = require('../../../lib/utils/measurementParser');
@@ -203,8 +199,7 @@ async function processProductWebhook(blingId: string | number) {
 
 async function processProductDeletedWebhook(blingId: string | number) {
   try {
-    const { createClient: createSupabaseClient } = require('@supabase/supabase-js');
-    const supabase = createSupabaseClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY! || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
+    const supabase = createAdminClient();
 
     const { error } = await supabase.from('stock_products').delete().eq('bling_id', blingId.toString());
     if (!error) {
@@ -223,8 +218,7 @@ async function processCategoryWebhook(blingId: string | number) {
     const cat = await BlingService.getCategory(blingId.toString());
     if (!cat) return;
 
-    const { createClient: createSupabaseClient } = require('@supabase/supabase-js');
-    const supabase = createSupabaseClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY! || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
+    const supabase = createAdminClient();
 
     const name = cat.descricao;
 
@@ -246,8 +240,7 @@ async function processStockWebhook(produtoId: string | number) {
     const balance = await BlingService.getStockBalance(produtoId.toString());
     if (!balance) return;
 
-    const { createClient: createSupabaseClient } = require('@supabase/supabase-js');
-    const supabase = createSupabaseClient(process.env.NEXT_PUBLIC_SUPABASE_URL!, process.env.SUPABASE_SERVICE_ROLE_KEY! || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!);
+    const supabase = createAdminClient();
 
     const totalStock = balance.saldoFisicoTotal || 0;
 

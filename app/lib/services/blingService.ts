@@ -302,4 +302,40 @@ export class BlingService {
 
     return allContacts;
   }
+
+  /**
+   * Create a new product in Bling
+   */
+  static async createProduct(productData: any) {
+    const response = await this.request('/produtos', {
+      method: 'POST',
+      body: JSON.stringify(productData)
+    });
+    
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`Falha ao criar produto no Bling: ${response.status} - ${errText}`);
+    }
+    
+    const result = await response.json();
+    return result.data;
+  }
+
+  /**
+   * Create a Commercial Proposal (Orçamento) in Bling
+   */
+  static async createPropostaComercial(propostaData: any) {
+    const response = await this.request('/propostas-comerciais', {
+      method: 'POST',
+      body: JSON.stringify(propostaData)
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`Falha ao criar proposta comercial no Bling: ${response.status} - ${errText}`);
+    }
+
+    const result = await response.json();
+    return result.data;
+  }
 }

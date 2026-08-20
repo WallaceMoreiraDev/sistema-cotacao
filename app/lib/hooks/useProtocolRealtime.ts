@@ -11,9 +11,8 @@ export function useProtocolRealtime(protocolId?: number) {
   
   const [registeredClients, setRegisteredClients] = useState<Client[]>([]);
   const [clientsLoading, setClientsLoading] = useState(true);
-  
 
-
+  // ── Refresh stock (called on load + on protocol_items/stock_products changes) ──
   const refreshStockData = useCallback(async () => {
     try {
       const [products, reservations] = await Promise.all([
@@ -39,17 +38,31 @@ export function useProtocolRealtime(protocolId?: number) {
     }
   }, [protocolId]);
 
-  useEffect(() => {
-    let cancelled = false;
-    
-    // Initial load
-    refreshStockData();
+  // ── Refresh clients (called on load + on clients changes) ──
+  const refreshClients = useCallback(async () => {
+    try {
+      const res = await getClientsAction();
+      if (res.success && res.data) {
+        setRegisteredClients(res.data);
+      }
+    } catch (error) {
+      console.error('Error refreshing clients:', error);
+    } finally {
+      setClientsLoading(false);
+    }
+  }, []);
 
-    // Supabase Realtime Subscription
+  useEffect(() => {
+    // ── Initial load ──
+    refreshStockData();
+    refreshClients();
+
+    // ── Supabase Realtime Subscription ──
     const supabase = createClient();
     const channelName = protocolId ? `protocol-changes-${protocolId}` : 'protocol-changes-novo';
     
     const channel = supabase.channel(channelName)
+      // Mudanças nos itens do protocolo → atualiza estoque reservado
       .on('postgres_changes', { 
         event: '*', 
         schema: 'public', 
@@ -57,6 +70,7 @@ export function useProtocolRealtime(protocolId?: number) {
       }, () => {
         refreshStockData();
       })
+      // Mudanças nos protocolos → atualiza reservas
       .on('postgres_changes', { 
         event: '*', 
         schema: 'public', 
@@ -64,21 +78,28 @@ export function useProtocolRealtime(protocolId?: number) {
       }, () => {
         refreshStockData();
       })
+      // Mudanças no estoque físico (via webhook Bling) → atualiza disponibilidade
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'stock_products' 
+      }, () => {
+        refreshStockData();
+      })
+      // Novos clientes sincronizados (via webhook ou sync manual) → atualiza autocomplete
+      .on('postgres_changes', { 
+        event: '*', 
+        schema: 'public', 
+        table: 'clients' 
+      }, () => {
+        refreshClients();
+      })
       .subscribe();
 
-    // Load initial static data
-    getClientsAction().then(res => { 
-      if (!cancelled && res.success && res.data) {
-        setRegisteredClients(res.data); 
-      }
-      if (!cancelled) setClientsLoading(false);
-    });
-
     return () => { 
-      cancelled = true; 
       supabase.removeChannel(channel); 
     };
-  }, [refreshStockData, protocolId]);
+  }, [refreshStockData, refreshClients, protocolId]);
 
   return { 
     stockProducts, 
