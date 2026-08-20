@@ -176,10 +176,9 @@ export function FormularioAdicaoItem({
                 </button>
               </div>
 
-              {/* Advanced Filters Form */}
               {isAdvancedSearchOpen && (
-                <div className="grid grid-cols-2 gap-4 sm:grid-cols-6 pt-2 border-t border-slate-100">
-                  <div className="col-span-2 sm:col-span-2 relative">
+                <div className="grid grid-cols-1 md:grid-cols-12 gap-y-4 gap-x-4 pt-4 border-t border-slate-100">
+                  <div className="md:col-span-3 relative">
                     <label className="block text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-1">
                       Nome da Peça / Categoria
                     </label>
@@ -195,11 +194,11 @@ export function FormularioAdicaoItem({
                     </select>
                   </div>
 
-                  <div className="col-span-2 sm:col-span-4 mt-2">
-                    <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-2">Medidas (mm)</p>
-                    <div className="flex flex-wrap gap-2">
+                  <div className="md:col-span-9">
+                    <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-1">Medidas (mm)</p>
+                    <div className="grid grid-cols-3 sm:grid-cols-6 gap-2">
                       {MEASUREMENT_FIELDS.map((field) => (
-                        <div key={field.key} className="w-20 flex-grow sm:flex-grow-0">
+                        <div key={field.key} className="w-full">
                           <label className="block text-[9px] font-medium text-slate-400 mb-0.5">{field.label}</label>
                           <div className="relative">
                             <input
@@ -219,7 +218,7 @@ export function FormularioAdicaoItem({
                     </div>
                   </div>
 
-                  <div className="col-span-2 sm:col-span-2 mt-2">
+                  <div className="md:col-span-4">
                     <label className="block text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-1">Tipo de Peça / Material</label>
                     <input
                       type="text"
@@ -230,7 +229,7 @@ export function FormularioAdicaoItem({
                     />
                   </div>
 
-                  <div className="col-span-2 sm:col-span-2">
+                  <div className="md:col-span-4">
                     <label className="block text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-1">Cód. Referência Fornecedor</label>
                     <input
                       type="text"
@@ -241,7 +240,7 @@ export function FormularioAdicaoItem({
                     />
                   </div>
 
-                  <div className="col-span-2 sm:col-span-2">
+                  <div className="md:col-span-4">
                     <label className="block text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-1">Cód. Ref. Parker Mundial</label>
                     <input
                       type="text"
@@ -252,7 +251,7 @@ export function FormularioAdicaoItem({
                     />
                   </div>
 
-                  <div className="col-span-2 sm:col-span-1">
+                  <div className="md:col-span-4">
                     <label className="block text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-1">Cód. OEM</label>
                     <input
                       type="text"
@@ -263,7 +262,7 @@ export function FormularioAdicaoItem({
                     />
                   </div>
 
-                  <div className="col-span-2 sm:col-span-2">
+                  <div className="md:col-span-8">
                     <label className="block text-[10px] font-semibold uppercase tracking-wider text-slate-500 mb-1">Marca do Produto</label>
                     <input
                       type="text"
