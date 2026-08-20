@@ -63,6 +63,16 @@ export function TabelaCotacao({
             const isLocked = isApproved || isRejected;
             const isUnlocked = unlockedItems.has(item.id);
             const disableMarkup = isViewing || (!isUnlocked && isLocked);
+            
+            // Determinar o fornecedor mais barato
+            let cheapestSupplierId: string | null = null;
+            if (item.supplierCosts) {
+              const validEntries = Object.entries(item.supplierCosts).filter(([_, v]) => v > 0);
+              if (validEntries.length > 0) {
+                const cheapest = validEntries.reduce((min, current) => current[1] < min[1] ? current : min);
+                cheapestSupplierId = cheapest[0];
+              }
+            }
 
             return (
               <div key={item.id} className="flex flex-col rounded-xl border border-slate-200 bg-white overflow-hidden shadow-sm transition-shadow hover:shadow-md">
@@ -124,21 +134,28 @@ export function TabelaCotacao({
                 <div className="p-4 bg-white">
                   <h4 className="text-[10px] font-bold text-slate-400 uppercase tracking-wider mb-3">Custos por Fornecedor (R$)</h4>
                   <div className="flex flex-wrap gap-4">
-                    {suppliers.map(sup => (
-                      <div key={sup.id} className="flex flex-col w-28 shrink-0">
-                        <label className="text-[11px] font-semibold text-slate-700 truncate" title={sup.name}>
-                          {sup.name}
-                        </label>
-                        <span className="text-[9px] text-slate-400 mb-1">{sup.type === 'Fornecedor Original' ? '(F. Orig)' : '(M. Loc)'}</span>
-                        <input
-                          type="number"
-                          placeholder="R$ 0,00"
-                          value={item.supplierCosts?.[sup.id] || ''}
-                          onChange={(e) => updateSupplierCost(item.id, String(sup.id), parseFloat(e.target.value))}
-                          className={`w-full rounded border py-1.5 px-2 text-sm text-center text-slate-900 transition-colors focus:ring-1 focus:outline-none border-slate-200`}
-                        />
-                      </div>
-                    ))}
+                    {suppliers.map(sup => {
+                      const isCheapest = String(sup.id) === cheapestSupplierId && !item.costPrice;
+                      
+                      return (
+                        <div key={sup.id} className="flex flex-col w-28 shrink-0 relative">
+                          <label className={`text-[11px] font-semibold truncate ${isCheapest ? 'text-emerald-700' : 'text-slate-700'}`} title={sup.name}>
+                            {sup.name}
+                          </label>
+                          <span className={`text-[9px] mb-1 ${isCheapest ? 'text-emerald-600 font-bold' : 'text-slate-400'}`}>
+                            {sup.type === 'Fornecedor Original' ? '(F. Orig)' : '(M. Loc)'}
+                            {isCheapest && ' 🏆'}
+                          </span>
+                          <input
+                            type="number"
+                            placeholder="R$ 0,00"
+                            value={item.supplierCosts?.[sup.id] || ''}
+                            onChange={(e) => updateSupplierCost(item.id, String(sup.id), parseFloat(e.target.value))}
+                            className={`w-full rounded border py-1.5 px-2 text-sm text-center transition-colors focus:ring-1 focus:outline-none ${isCheapest ? 'border-emerald-500 bg-emerald-50 text-emerald-900 shadow-sm ring-emerald-500' : 'border-slate-200 text-slate-900 bg-white'}`}
+                          />
+                        </div>
+                      )
+                    })}
                   </div>
                 </div>
 

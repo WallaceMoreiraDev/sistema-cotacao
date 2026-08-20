@@ -1,44 +1,63 @@
-import { useEffect, useCallback, useState } from 'react';
+import { useEffect, useCallback, useState, useMemo } from 'react';
 import { createClient } from '../supabase/client';
 import { fetchStock } from '../services/stockService';
 import { getReservedStockAction } from '../actions/protocols';
 import { getClientsAction } from '../actions/clients';
-import type { StockProduct, Client } from '../types/database';
+import type { StockProduct, Client, StockHolder } from '../types/database';
 
 export function useProtocolRealtime(protocolId?: number) {
-  const [stockProducts, setStockProducts] = useState<StockProduct[]>([]);
+  const [baseStock, setBaseStock] = useState<StockProduct[]>([]);
+  const [reservations, setReservations] = useState<Record<string, { total: number, heldBy: StockHolder[] }>>({});
   const [stockLoading, setStockLoading] = useState(true);
   
   const [registeredClients, setRegisteredClients] = useState<Client[]>([]);
   const [clientsLoading, setClientsLoading] = useState(true);
 
-  // ── Refresh stock (called on load + on protocol_items/stock_products changes) ──
-  const refreshStockData = useCallback(async () => {
+  // ── Derived Stock Products (Base - Reservations) ──
+  const stockProducts = useMemo(() => {
+    return baseStock.map(p => {
+      const identifier = p.code || p.sku || p.name;
+      const reservedData = reservations[identifier] || { total: 0, heldBy: [] };
+      return {
+        ...p,
+        stock: Math.max(0, p.stock - reservedData.total),
+        heldBy: reservedData.heldBy
+      };
+    });
+  }, [baseStock, reservations]);
+
+  // ── Network Fetchers ──
+  const refreshBaseStock = useCallback(async () => {
     try {
-      const [products, reservations] = await Promise.all([
-        fetchStock(),
-        getReservedStockAction(protocolId)
-      ]);
-      
-      const realProducts = products.map(p => {
-        const identifier = p.code || p.sku || p.name;
-        const reservedData = reservations[identifier] || { total: 0, heldBy: [] };
-        return {
-          ...p,
-          stock: Math.max(0, p.stock - reservedData.total),
-          heldBy: reservedData.heldBy
-        };
-      });
-      
-      setStockProducts(realProducts);
+      const products = await fetchStock();
+      setBaseStock(products);
     } catch (error) {
-      console.error('Error refreshing stock data:', error);
-    } finally {
-      setStockLoading(false);
+      console.error('Error fetching base stock:', error);
+    }
+  }, []);
+
+  const refreshReservations = useCallback(async () => {
+    try {
+      const data = await getReservedStockAction(protocolId);
+      setReservations(data);
+    } catch (error) {
+      console.error('Error fetching reservations:', error);
     }
   }, [protocolId]);
 
-  // ── Refresh clients (called on load + on clients changes) ──
+  const refreshStockData = useCallback(async () => {
+    setStockLoading(true);
+    await Promise.all([refreshBaseStock(), refreshReservations()]);
+    setStockLoading(false);
+  }, [refreshBaseStock, refreshReservations]);
+
+  // Debounced reservation refresh (since we can't easily calculate reservations client-side)
+  const refreshReservationsDebounced = useCallback(() => {
+    if ((window as any)._reservationsRefreshTimer) clearTimeout((window as any)._reservationsRefreshTimer);
+    (window as any)._reservationsRefreshTimer = setTimeout(() => refreshReservations(), 800);
+  }, [refreshReservations]);
+
+  // ── Clients Fetchers ──
   const refreshClients = useCallback(async () => {
     try {
       const res = await getClientsAction();
@@ -52,61 +71,57 @@ export function useProtocolRealtime(protocolId?: number) {
     }
   }, []);
 
+  const refreshClientsDebounced = useCallback(() => {
+    if ((window as any)._clientsRefreshTimer) clearTimeout((window as any)._clientsRefreshTimer);
+    (window as any)._clientsRefreshTimer = setTimeout(() => refreshClients(), 800);
+  }, [refreshClients]);
+
   useEffect(() => {
     // ── Initial load ──
     refreshStockData();
     refreshClients();
 
-    // ── Supabase Realtime Subscription ──
     const supabase = createClient();
-    const channelName = protocolId ? `protocol-changes-${protocolId}` : 'protocol-changes-novo';
-    
+    const channelName = `protocol_${protocolId || 'new'}_${Date.now()}`;
+
     const channel = supabase.channel(channelName)
-      // Mudanças nos itens do protocolo → atualiza estoque reservado
-      .on('postgres_changes', { 
-        event: '*', 
-        schema: 'public', 
-        table: 'protocol_items' 
-      }, () => {
-        refreshStockData();
+      // ── Granular Stock Products Events (No Network Requests!) ──
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'stock_products' }, (payload) => {
+        setBaseStock(prev => prev.map(p => p.id === payload.new.id ? (payload.new as StockProduct) : p));
       })
-      // Mudanças nos protocolos → atualiza reservas
-      .on('postgres_changes', { 
-        event: '*', 
-        schema: 'public', 
-        table: 'protocols' 
-      }, () => {
-        refreshStockData();
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'stock_products' }, (payload) => {
+        setBaseStock(prev => [...prev, payload.new as StockProduct]);
       })
-      // Mudanças no estoque físico (via webhook Bling) → atualiza disponibilidade
-      .on('postgres_changes', { 
-        event: '*', 
-        schema: 'public', 
-        table: 'stock_products' 
-      }, () => {
-        refreshStockData();
+      .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'stock_products' }, (payload) => {
+        setBaseStock(prev => prev.filter(p => p.id !== (payload.old as any).id));
       })
-      // Novos clientes sincronizados (via webhook ou sync manual) → atualiza autocomplete
-      .on('postgres_changes', { 
-        event: '*', 
-        schema: 'public', 
-        table: 'clients' 
-      }, () => {
-        refreshClients();
+      
+      // ── Reservations Events (Network Request, but debounced and lightweight) ──
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'protocol_items' }, () => {
+        refreshReservationsDebounced();
+      })
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'protocols' }, () => {
+        refreshReservationsDebounced();
+      })
+
+      // ── Clients Events ──
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'clients' }, () => {
+        refreshClientsDebounced();
       })
       .subscribe();
 
-    return () => { 
-      supabase.removeChannel(channel); 
+    return () => {
+      supabase.removeChannel(channel);
+      if ((window as any)._reservationsRefreshTimer) clearTimeout((window as any)._reservationsRefreshTimer);
+      if ((window as any)._clientsRefreshTimer) clearTimeout((window as any)._clientsRefreshTimer);
     };
-  }, [refreshStockData, refreshClients, protocolId]);
+  }, [refreshStockData, refreshClients, protocolId, refreshReservationsDebounced, refreshClientsDebounced]);
 
-  return { 
-    stockProducts, 
-    setStockProducts, 
-    stockLoading, 
-    registeredClients, 
-    refreshStockData,
-    clientsLoading
+  return {
+    stockProducts,
+    stockLoading,
+    registeredClients,
+    clientsLoading,
+    refreshStockData
   };
 }

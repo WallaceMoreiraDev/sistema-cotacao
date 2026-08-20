@@ -60,6 +60,8 @@ export default function AdminFornecedoresPage() {
     }
   };
 
+  const [searchQuery, setSearchQuery] = useState('');
+
   return (
     <div className="space-y-6 max-w-6xl mx-auto">
       <div className="rounded-[32px] border border-slate-200/60 bg-white/70 backdrop-blur-xl p-6 sm:p-8 shadow-2xl shadow-slate-200/40 relative overflow-hidden flex flex-col min-h-[500px]">
@@ -82,15 +84,29 @@ export default function AdminFornecedoresPage() {
           </div>
           
           {!isAdding && (
-            <button
-              onClick={() => setIsAdding(true)}
-              className="inline-flex shrink-0 items-center gap-2 rounded-2xl bg-slate-900 px-6 py-3 text-sm font-bold text-white shadow-xl shadow-slate-900/20 transition-all hover:bg-slate-800 hover:-translate-y-0.5 focus:ring-2 focus:ring-slate-900 focus:ring-offset-2"
-            >
-              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
-              </svg>
-              Novo Fornecedor
-            </button>
+            <div className="flex items-center gap-3 w-full sm:w-auto">
+              <div className="relative w-full sm:w-64">
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Buscar fornecedor..."
+                  className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-sm text-slate-800 outline-none transition-all placeholder:text-slate-400 focus:border-emerald-500 focus:ring-4 focus:ring-emerald-500/10"
+                />
+                <svg className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </div>
+              <button
+                onClick={() => setIsAdding(true)}
+                className="inline-flex shrink-0 items-center gap-2 rounded-2xl bg-slate-900 px-6 py-3 text-sm font-bold text-white shadow-xl shadow-slate-900/20 transition-all hover:bg-slate-800 hover:-translate-y-0.5 focus:ring-2 focus:ring-slate-900 focus:ring-offset-2 whitespace-nowrap"
+              >
+                <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+                </svg>
+                Novo Fornecedor
+              </button>
+            </div>
           )}
         </div>
 
@@ -196,34 +212,42 @@ export default function AdminFornecedoresPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
-                  {suppliers.map((sup) => (
-                    <tr key={sup.id} className="hover:bg-slate-50/50 transition-colors group">
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <div className="font-bold text-sm text-slate-900">{sup.name}</div>
-                        <div className="text-[10px] uppercase font-bold text-slate-400 mt-1">ID: {sup.id}</div>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-semibold ${
-                          sup.type === 'Fornecedor Original' 
-                            ? 'bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-700/10' 
-                            : 'bg-orange-50 text-orange-700 ring-1 ring-inset ring-orange-700/10'
-                        }`}>
-                          {sup.type}
-                        </span>
-                      </td>
-                      <td className="px-6 py-4 whitespace-nowrap text-right space-x-2">
-                        <button
-                          onClick={() => handleDelete(sup.id)}
-                          className="inline-flex items-center gap-1 text-xs font-bold text-slate-400 hover:text-red-600 hover:bg-red-50 px-3 py-1.5 rounded-xl transition-all"
-                        >
-                          <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-                          </svg>
-                          Excluir
-                        </button>
+                  {suppliers.filter(sup => sup.name.toLowerCase().includes(searchQuery.toLowerCase()) || sup.type.toLowerCase().includes(searchQuery.toLowerCase())).length === 0 ? (
+                    <tr>
+                      <td colSpan={3} className="px-6 py-8 text-center text-slate-400">
+                        Nenhum fornecedor encontrado para "{searchQuery}".
                       </td>
                     </tr>
-                  ))}
+                  ) : (
+                    suppliers.filter(sup => sup.name.toLowerCase().includes(searchQuery.toLowerCase()) || sup.type.toLowerCase().includes(searchQuery.toLowerCase())).map((sup) => (
+                      <tr key={sup.id} className="hover:bg-slate-50/50 transition-colors group">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="font-bold text-sm text-slate-900">{sup.name}</div>
+                          <div className="text-[10px] uppercase font-bold text-slate-400 mt-1">ID: {sup.id}</div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`inline-flex items-center rounded-md px-2 py-1 text-xs font-semibold ${
+                            sup.type === 'Fornecedor Original' 
+                              ? 'bg-blue-50 text-blue-700 ring-1 ring-inset ring-blue-700/10' 
+                              : 'bg-orange-50 text-orange-700 ring-1 ring-inset ring-orange-700/10'
+                          }`}>
+                            {sup.type}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-right space-x-2">
+                          <button
+                            onClick={() => handleDelete(sup.id)}
+                            className="inline-flex items-center gap-1 text-xs font-bold text-slate-400 hover:text-red-600 hover:bg-red-50 px-3 py-1.5 rounded-xl transition-all"
+                          >
+                            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                            </svg>
+                            Excluir
+                          </button>
+                        </td>
+                      </tr>
+                    ))
+                  )}
                 </tbody>
               </table>
             </div>

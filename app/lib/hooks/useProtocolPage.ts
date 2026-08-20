@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
@@ -94,7 +94,12 @@ export function useProtocolPage({
         try {
           const res = await saveProtocolAction({ ...protocol, id: protocolIdRef.current }, options);
           resolve(res);
-        } catch (e) { reject(e); }
+        } catch (e) { 
+          reject(e); 
+        }
+      }).catch((e) => {
+        // Se a promessa anterior falhou, garantimos que a fila continua viva e rejeitamos esta chamada
+        reject(e);
       });
     });
   }, []);

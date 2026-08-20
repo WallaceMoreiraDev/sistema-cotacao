@@ -137,7 +137,23 @@ export async function getSealFamiliesAction() {
 export async function createSealFamilyAction(name: string) {
   try {
     const supabase = await createClient();
-    const { data, error } = await supabase.from('seal_families').insert([{ name }]).select().single();
+    
+    // 1. Create in Bling
+    let blingId = null;
+    try {
+      const { BlingService } = await import('../services/blingService');
+      const newCategory = await BlingService.createCategory({ descricao: name });
+      blingId = newCategory.id;
+    } catch (blingErr: any) {
+      console.error('Falha ao criar categoria no Bling:', blingErr);
+      throw new Error(`Falha ao sincronizar com o Bling: ${blingErr.message}`);
+    }
+
+    // 2. Create locally
+    const { data, error } = await supabase.from('seal_families').insert([{ 
+      name,
+      bling_id: blingId 
+    }]).select().single();
 
     if (error) throw error;
 
@@ -150,6 +166,22 @@ export async function createSealFamilyAction(name: string) {
 export async function updateSealFamilyAction(id: string | number, name: string) {
   try {
     const supabase = await createClient();
+    
+    // Check if it has a bling_id
+    const { data: family } = await supabase.from('seal_families').select('bling_id').eq('id', id).single();
+    
+    if (family && family.bling_id) {
+      // 1. Update in Bling
+      try {
+        const { BlingService } = await import('../services/blingService');
+        await BlingService.updateCategory(family.bling_id, { descricao: name });
+      } catch (blingErr) {
+        console.error(`Falha ao atualizar categoria ${family.bling_id} no Bling:`, blingErr);
+        throw new Error('Falha ao sincronizar atualização de Família com o Bling.');
+      }
+    }
+
+    // 2. Update locally
     const { data, error } = await supabase.from('seal_families').update({ name }).eq('id', id).select().single();
 
     if (error) throw error;

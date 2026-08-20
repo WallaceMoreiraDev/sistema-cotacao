@@ -338,4 +338,40 @@ export class BlingService {
     const result = await response.json();
     return result.data;
   }
+
+  /**
+   * Create a Product Category in Bling
+   */
+  static async createCategory(categoryData: { descricao: string }) {
+    const response = await this.request('/categorias/produtos', {
+      method: 'POST',
+      body: JSON.stringify(categoryData)
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`Falha ao criar categoria no Bling: ${response.status} - ${errText}`);
+    }
+
+    const result = await response.json();
+    return result.data;
+  }
+
+  /**
+   * Update a Product Category in Bling
+   */
+  static async updateCategory(id: number | string, categoryData: { descricao: string }) {
+    const response = await this.request(`/categorias/produtos/${id}`, {
+      method: 'PUT',
+      body: JSON.stringify(categoryData)
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`Falha ao atualizar categoria no Bling: ${response.status} - ${errText}`);
+    }
+
+    const result = await response.json();
+    return result.data;
+  }
 }

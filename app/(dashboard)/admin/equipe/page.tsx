@@ -88,6 +88,8 @@ export default function EquipePage() {
     }
   }
 
+  const [searchQuery, setSearchQuery] = useState('');
+
   return (
     <div className="space-y-6 max-w-6xl mx-auto">
       {/* Header */}
@@ -96,15 +98,29 @@ export default function EquipePage() {
           <h1 className="text-2xl font-black text-slate-900 tracking-tight">Equipe e Acessos</h1>
           <p className="text-sm text-slate-500 mt-1">Gerencie os funcionários, cargos e permissões do sistema.</p>
         </div>
-        <button
-          onClick={() => setIsCreateModalOpen(true)}
-          className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition-all hover:bg-slate-800 focus:ring-4 focus:ring-slate-900/10 active:scale-95"
-        >
-          <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-          Adicionar Funcionário
-        </button>
+        <div className="flex items-center gap-3 w-full sm:w-auto">
+          <div className="relative w-full sm:w-64">
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Buscar por nome ou e-mail..."
+              className="w-full rounded-xl border border-slate-200 bg-white py-2.5 pl-10 pr-4 text-sm text-slate-800 outline-none transition-all placeholder:text-slate-400 focus:border-indigo-400 focus:ring-4 focus:ring-indigo-400/10"
+            />
+            <svg className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+            </svg>
+          </div>
+          <button
+            onClick={() => setIsCreateModalOpen(true)}
+            className="inline-flex items-center gap-2 rounded-xl bg-slate-900 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition-all hover:bg-slate-800 focus:ring-4 focus:ring-slate-900/10 active:scale-95 whitespace-nowrap"
+          >
+            <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+            </svg>
+            Adicionar Funcionário
+          </button>
+        </div>
       </div>
 
       {/* Tabela */}
@@ -130,23 +146,38 @@ export default function EquipePage() {
                   <td colSpan={5} className="px-6 py-8 text-center text-slate-400">Nenhum usuário cadastrado.</td>
                 </tr>
               ) : (
-                users.map((u) => (
-                  <tr key={u.id} className="hover:bg-slate-50/50 transition-colors">
-                    <td className="px-6 py-4">
-                      <div className="font-bold text-slate-900">{u.full_name}</div>
-                      <div className="text-xs text-slate-500">{u.email}</div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <div className="font-semibold text-slate-700">{u.job_title}</div>
-                      <div className="text-xs text-slate-500">{u.department}</div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wide ${
-                        u.role === 'admin' ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-700'
-                      }`}>
-                        {u.role}
-                      </span>
-                    </td>
+                users.filter(u => 
+                  u.full_name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                  u.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                  u.role.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                  (u.department && u.department.toLowerCase().includes(searchQuery.toLowerCase()))
+                ).length === 0 ? (
+                  <tr>
+                    <td colSpan={5} className="px-6 py-8 text-center text-slate-400">Nenhum usuário encontrado para "{searchQuery}".</td>
+                  </tr>
+                ) : (
+                  users.filter(u => 
+                    u.full_name.toLowerCase().includes(searchQuery.toLowerCase()) || 
+                    u.email.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                    u.role.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                    (u.department && u.department.toLowerCase().includes(searchQuery.toLowerCase()))
+                  ).map((u) => (
+                    <tr key={u.id} className="hover:bg-slate-50/50 transition-colors">
+                      <td className="px-6 py-4">
+                        <div className="font-bold text-slate-900">{u.full_name}</div>
+                        <div className="text-xs text-slate-500">{u.email}</div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <div className="font-semibold text-slate-700">{u.job_title}</div>
+                        <div className="text-xs text-slate-500">{u.department}</div>
+                      </td>
+                      <td className="px-6 py-4">
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-bold uppercase tracking-wide ${
+                          u.role === 'admin' ? 'bg-indigo-100 text-indigo-700' : 'bg-slate-100 text-slate-700'
+                        }`}>
+                          {u.role}
+                        </span>
+                      </td>
                     <td className="px-6 py-4">
                       <span className={`inline-flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-semibold ${
                         u.status === 'ativo' ? 'bg-emerald-50 text-emerald-700' : 'bg-rose-50 text-rose-700'
@@ -171,9 +202,10 @@ export default function EquipePage() {
                           {u.status === 'ativo' ? 'Desativar' : 'Reativar'}
                         </button>
                       </div>
-                    </td>
-                  </tr>
-                ))
+                      </td>
+                    </tr>
+                  ))
+                )
               )}
             </tbody>
           </table>

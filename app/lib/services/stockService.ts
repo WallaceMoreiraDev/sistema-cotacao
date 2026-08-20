@@ -19,7 +19,7 @@ export async function fetchStock(): Promise<StockProduct[]> {
         .range(page * pageSize, (page + 1) * pageSize - 1);
 
       if (error) {
-        console.error('Error fetching stock from Supabase:', error);
+        console.error('Error fetching stock from Supabase:', JSON.stringify(error, Object.getOwnPropertyNames(error), 2));
         break;
       }
       

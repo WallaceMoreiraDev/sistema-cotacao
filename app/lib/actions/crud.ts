@@ -27,6 +27,7 @@ function mapRowToProtocolItem(row: any): ProtocolItem {
     salePrice: Number(row.sale_price ?? 0),
     needsApproval: Boolean(row.needs_approval),
     approvalStatus: row.approval_status || 'pending',
+    supplierCosts: row.supplier_costs || {},
   };
 }
 
@@ -176,24 +177,26 @@ export async function saveProtocolAction(protocol: Protocol, options?: { skipDif
         
         // Fetch current stock from DB for the items
         const identifiers = estoqueItems.map(i => i.code || i.oem || i.name).filter(Boolean);
-        const { data: stockData } = await supabase
-          .from('stock_products')
-          .select('sku, code, name, stock')
-          .or(`code.in.(${identifiers.map(i => `"${i}"`).join(',')}),sku.in.(${identifiers.map(i => `"${i}"`).join(',')}),name.in.(${identifiers.map(i => `"${i}"`).join(',')})`);
-          
-        if (stockData) {
-          for (const item of estoqueItems) {
-            const identifier = item.code || item.oem || item.name;
-            if (!identifier) continue;
+        if (identifiers.length > 0) {
+          const { data: stockData } = await supabase
+            .from('stock_products')
+            .select('sku, code, name, stock')
+            .or(`code.in.(${identifiers.map(i => `"${i}"`).join(',')}),sku.in.(${identifiers.map(i => `"${i}"`).join(',')}),name.in.(${identifiers.map(i => `"${i}"`).join(',')})`);
             
-            const product = stockData.find(p => p.code === identifier || p.sku === identifier || p.name === identifier);
-            if (product) {
-              const maxStock = Number(product.stock) || 0;
-              const reserved = reservations[identifier]?.total || 0;
-              const freeStock = maxStock - reserved;
+          if (stockData) {
+            for (const item of estoqueItems) {
+              const identifier = item.code || item.oem || item.name;
+              if (!identifier) continue;
               
-              if (item.quantity > freeStock) {
-                return { success: false, error: `Estoque insuficiente para o item ${item.name}. Disponível: ${freeStock}, Solicitado: ${item.quantity}. Recarregue a página para ver os estoques atualizados.` };
+              const product = stockData.find(p => p.code === identifier || p.sku === identifier || p.name === identifier);
+              if (product) {
+                const maxStock = Number(product.stock) || 0;
+                const reserved = reservations[identifier]?.total || 0;
+                const freeStock = maxStock - reserved;
+                
+                if (item.quantity > freeStock) {
+                  return { success: false, error: `Estoque insuficiente para o item ${item.name}. Disponível: ${freeStock}, Solicitado: ${item.quantity}. Recarregue a página para ver os estoques atualizados.` };
+                }
               }
             }
           }
@@ -277,6 +280,7 @@ export async function saveProtocolAction(protocol: Protocol, options?: { skipDif
           sale_price: finalSalePrice,
           needs_approval: finalNeedsApproval,
           approval_status: finalApprovalStatus,
+          supplier_costs: item.supplierCosts || {},
         };
       });
 
