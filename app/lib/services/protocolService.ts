@@ -31,20 +31,18 @@ export function calculateTotals(items: ProtocolItem[]) {
   let totalACotar = 0;
 
   for (const item of items) {
+    const sale = (item.salePrice ?? 0) * item.quantity;
+    
     if (item.type === 'estoque') {
-      const cost = item.costPrice ?? item.unitPrice ?? 0;
-      const markup = item.markupPercent ?? 70;
-      const sale = cost * (1 + markup / 100) * item.quantity;
       totalEstoque += sale;
     } else {
       // a_cotar
-      const sale = (item.salePrice ?? 0) * item.quantity;
       totalACotar += sale;
     }
   }
 
   const subtotal = totalEstoque + totalACotar;
-  const total = subtotal; // markup already baked into each item
+  const total = subtotal; // markup already baked into each item's salePrice
 
   return { subtotal, markup: 0, total, totalEstoque, totalACotar };
 }
