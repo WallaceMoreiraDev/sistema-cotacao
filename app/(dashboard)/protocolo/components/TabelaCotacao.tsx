@@ -257,19 +257,21 @@ export function TabelaCotacao({
                       )}
                     </div>
                     
-                    {/* Right: Ações Rápidas */}
-                    <div className="flex items-center gap-3">
-                      <label className="flex items-center gap-2 cursor-pointer bg-slate-100 hover:bg-slate-200 transition-colors px-2 py-1 rounded border border-slate-200">
-                        <input
-                          type="checkbox"
-                          checked={!!item.excludeFromPurchasing}
-                          onChange={() => toggleExcludeFromPurchasing && toggleExcludeFromPurchasing(item.id)}
-                          disabled={isViewing || isPurchased}
-                          className="rounded border-slate-300 text-brand focus:ring-brand"
-                        />
-                        <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">Excluir da Lista Geral</span>
-                      </label>
-                    </div>
+                    {/* Right: Ações Rápidas — wrapped in its own fieldset to escape parent disabled */}
+                    <fieldset disabled={false} className="contents">
+                      <div className="flex items-center gap-3">
+                        <label className="flex items-center gap-2 cursor-pointer bg-slate-100 hover:bg-slate-200 transition-colors px-2 py-1 rounded border border-slate-200">
+                          <input
+                            type="checkbox"
+                            checked={!!item.excludeFromPurchasing}
+                            onChange={() => toggleExcludeFromPurchasing && toggleExcludeFromPurchasing(item.id)}
+                            disabled={isPurchased}
+                            className="rounded border-slate-300 text-brand focus:ring-brand"
+                          />
+                          <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">Excluir da Lista Geral</span>
+                        </label>
+                      </div>
+                    </fieldset>
                   </div>
 
                   {/* Right: Financeiro */}
