@@ -16,7 +16,6 @@ interface TabelaCotacaoProps {
   handleReallocate: (id: string, maxQty: number) => void;
   getFreeStock: (identifier: string) => number;
   forceItemSupplier?: (itemId: string, supplierId: string | null) => void;
-  toggleItemPurchased?: (itemId: string) => void;
   userRole?: string;
   isViewing?: boolean;
 }
@@ -32,7 +31,6 @@ export function TabelaCotacao({
   handleReallocate,
   getFreeStock,
   forceItemSupplier,
-  toggleItemPurchased,
   userRole,
   isViewing = false,
 }: TabelaCotacaoProps) {
@@ -98,9 +96,10 @@ export function TabelaCotacao({
             const isRejected = item.approvalStatus === 'rejected';
             // Lock only appears when the item actually went through an approval flow.
             // Normal-markup items (needsApproval=false) should never show any lock/badge.
+            const isPurchased = item.status === 'comprado';
             const isLocked = item.needsApproval && (isApproved || isRejected);
             const isUnlocked = unlockedItems.has(item.id);
-            const disableMarkup = isViewing || (!isUnlocked && isLocked);
+            const disableMarkup = isViewing || isPurchased || (!isUnlocked && isLocked);
             
             // Determinar o fornecedor mais barato
             let cheapestSupplierId: string | null = null;
@@ -126,14 +125,15 @@ export function TabelaCotacao({
               <div key={item.id} className="flex flex-col rounded-xl border border-slate-200 bg-white overflow-hidden shadow-sm transition-shadow hover:shadow-md">
                 
                 {/* 1. CABEÇALHO DO ITEM */}
-                <div className={`flex flex-col md:flex-row md:items-center justify-between p-4 border-b gap-4 transition-colors ${item.isPurchased ? 'bg-slate-100/50 opacity-80 border-slate-200' : 'bg-slate-50 border-slate-200'}`}>
+                <div className={`flex flex-col md:flex-row md:items-center justify-between p-4 border-b gap-4 transition-colors ${isPurchased ? 'bg-slate-100/50 opacity-80 border-slate-200' : 'bg-slate-50 border-slate-200'}`}>
                   
                   {/* Left: Identificação */}
-                  <div className={`flex items-start gap-3 ${item.isPurchased ? 'opacity-60' : ''}`}>
+                  <div className={`flex items-start gap-3 ${isPurchased ? 'opacity-60' : ''}`}>
                     <span className="text-slate-400 font-bold text-sm">#{index + 1 + estoqueItemsCount}</span>
                     <div>
                       <div className="font-bold text-slate-800 text-sm leading-tight flex flex-wrap items-center gap-2">
                         {item.name}
+                        {isPurchased && <span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 text-[10px] font-bold border border-emerald-200">✅ COMPRADO</span>}
                         {item.brand && <span className="px-1.5 py-0.5 rounded bg-slate-200/70 text-slate-600 text-[10px]">Marca: {item.brand}</span>}
                         {item.oem && <span className="px-1.5 py-0.5 rounded bg-slate-200/70 text-slate-600 text-[10px]">OEM: {item.oem}</span>}
                       </div>
@@ -160,10 +160,11 @@ export function TabelaCotacao({
                         min="1"
                         value={item.quantity}
                         onChange={(e) => updateQuantity(item.id, Number(e.target.value))}
-                        className="w-16 rounded border border-slate-300 py-1 px-2 text-sm text-center text-slate-900 focus:border-emerald-500 focus:ring-emerald-500"
+                        disabled={isViewing || isPurchased}
+                        className="w-16 rounded border border-slate-300 py-1 px-2 text-sm text-center text-slate-900 focus:border-emerald-500 focus:ring-emerald-500 disabled:opacity-50 disabled:bg-slate-100"
                       />
                     </div>
-                    {!isViewing && (
+                    {!isViewing && !isPurchased && (
                       <button
                         type="button"
                         onClick={() => removeItem(item.id)}
@@ -219,7 +220,8 @@ export function TabelaCotacao({
                             placeholder="R$ 0,00"
                             value={item.supplierCosts?.[sup.id] || ''}
                             onChange={(e) => updateSupplierCost(item.id, String(sup.id), parseFloat(e.target.value))}
-                            className={`w-full rounded border py-1.5 px-2 text-sm text-center transition-colors focus:ring-1 focus:outline-none ${isCheapest || item.forcedSupplierId === String(sup.id) ? 'border-emerald-500 bg-emerald-50 text-emerald-900 shadow-sm ring-emerald-500' : 'border-slate-200 text-slate-900 bg-white'}`}
+                            disabled={isViewing || isPurchased}
+                            className={`w-full rounded border py-1.5 px-2 text-sm text-center transition-colors focus:ring-1 focus:outline-none ${isCheapest || item.forcedSupplierId === String(sup.id) ? 'border-emerald-500 bg-emerald-50 text-emerald-900 shadow-sm ring-emerald-500' : 'border-slate-200 text-slate-900 bg-white'} disabled:opacity-60`}
                           />
                         </div>
                       )
@@ -251,20 +253,6 @@ export function TabelaCotacao({
                           Aproveitar {freeStock} un. Estoque
                         </button>
                       )}
-                    </div>
-                    
-                    {/* Right: Ações Rápidas */}
-                    <div className="flex items-center gap-3">
-                      <label className="flex items-center gap-2 cursor-pointer bg-slate-100 hover:bg-slate-200 transition-colors px-2 py-1 rounded border border-slate-200">
-                        <input
-                          type="checkbox"
-                          checked={!!item.isPurchased}
-                          onChange={() => toggleItemPurchased && toggleItemPurchased(item.id)}
-                          disabled={isViewing}
-                          className="rounded border-slate-300 text-brand focus:ring-brand"
-                        />
-                        <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">Excluir da Lista Geral</span>
-                      </label>
                     </div>
                   </div>
 

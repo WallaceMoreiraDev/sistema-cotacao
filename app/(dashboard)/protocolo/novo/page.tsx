@@ -42,7 +42,7 @@ export default function NewProtocolPage() {
     handleAddItem, handleAddStockItem, handleReallocate,
     removeEstoqueItem, updateEstoqueItemQuantity, splitEstoqueItem,
     removeACotarItem, updateACotarItemQuantity, updateSupplierCost,
-    forceItemSupplier, toggleItemPurchased, updateItemMarkup, updateItemField, updateMeasurement, clearItemForm,
+    forceItemSupplier, updateItemMarkup, updateItemField, updateMeasurement, clearItemForm,
     handleCreateNewItem, allItems,
     isFormUnlocked, isItemFormValid, canFinalize,
     triggerSaveCheck, handleCancelar, confirmCancelar,
@@ -102,7 +102,6 @@ export default function NewProtocolPage() {
         updateQuantity={updateACotarItemQuantity} updateSupplierCost={updateSupplierCost}
         removeItem={removeACotarItem} updateItemMarkup={updateItemMarkup}
         forceItemSupplier={forceItemSupplier}
-        toggleItemPurchased={toggleItemPurchased}
         userRole={user?.role}
         handleReallocate={(id, qty) => handleReallocate(id, qty, stockProducts)}
         getFreeStock={identifier => getFreeStock(identifier, stockProducts)}

@@ -48,7 +48,7 @@ export interface ProtocolItem {
   quantity: number;
   unitPrice: number;
   type: 'estoque' | 'a_cotar';
-  status: 'pendente' | 'aprovado' | 'reprovado' | 'reservado';
+  status?: 'pendente' | 'aprovado' | 'reprovado' | 'reservado' | 'comprado';
   oem?: string;
   nickname?: string;
   oem_code?: string;
@@ -71,7 +71,6 @@ export interface ProtocolItem {
   needsApproval?: boolean; // true when markup differs from default
   approvalStatus?: 'pending' | 'approved' | 'rejected'; // State of the requested markup
   isMarkupDirty?: boolean; // true if the user locally edited the markup but hasn't saved/synced yet
-  isPurchased?: boolean; // true if marked as purchased in the new general list
   // ── Stock reference ──
   stockQty?: number; // qty found in stock at time of addition
   costPrice?: number; // from stock

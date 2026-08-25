@@ -669,13 +669,6 @@ export function useProtocolState(initialEstoque: ProtocolItem[] = [], initialACo
     }));
   }, [suppliers, userRole]);
 
-  const toggleItemPurchased = useCallback((itemId: string) => {
-    setACotarItems(prev => prev.map(item => 
-      item.id === itemId ? { ...item, isPurchased: !item.isPurchased } : item
-    ));
-  }, []);
-
-
   const updateItemMarkup = useCallback((itemId: string, value: string) => {
     const isReset = value.trim() === '';
     // Reject mid-typing states like '-', '.', '-.' that aren't valid numbers yet
@@ -897,7 +890,6 @@ export function useProtocolState(initialEstoque: ProtocolItem[] = [], initialACo
     updateACotarItemQuantity,
     updateSupplierCost,
     forceItemSupplier,
-    toggleItemPurchased,
     updateItemMarkup,
     updateItemField,
     updateMeasurement,

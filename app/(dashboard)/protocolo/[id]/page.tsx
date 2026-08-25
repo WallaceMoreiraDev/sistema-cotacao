@@ -47,7 +47,7 @@ export default function ProtocolDetailPage() {
     handleAddItem, handleAddStockItem, handleReallocate,
     removeEstoqueItem, updateEstoqueItemQuantity,
     removeACotarItem, updateACotarItemQuantity, updateSupplierCost,
-    forceItemSupplier, toggleItemPurchased, updateItemMarkup, updateItemField, updateMeasurement, clearItemForm,
+    forceItemSupplier, updateItemMarkup, updateItemField, updateMeasurement, clearItemForm,
     handleCreateNewItem, allItems,
     isFormUnlocked, isItemFormValid, canFinalize, canSendToBling,
     handleCancelar, confirmCancelar, handleRestaurar, handleEstornar,
@@ -149,7 +149,6 @@ export default function ProtocolDetailPage() {
         updateQuantity={updateACotarItemQuantity} updateSupplierCost={updateSupplierCost}
         removeItem={removeACotarItem} updateItemMarkup={updateItemMarkup}
         forceItemSupplier={forceItemSupplier}
-        toggleItemPurchased={toggleItemPurchased}
         userRole={user?.role}
         handleReallocate={(id, qty) => handleReallocate(id, qty, stockProducts)}
         getFreeStock={identifier => getFreeStock(identifier, stockProducts)} isViewing={isViewing} />

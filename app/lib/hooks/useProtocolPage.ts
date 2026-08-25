@@ -61,7 +61,7 @@ export function useProtocolPage({
     handleAddItem, handleAddStockItem, handleReallocate,
     removeEstoqueItem, updateEstoqueItemQuantity, splitEstoqueItem,
     splitMultipleEstoqueItems, removeACotarItem, updateACotarItemQuantity,
-    updateSupplierCost, forceItemSupplier, toggleItemPurchased, updateItemMarkup, updateItemField, updateMeasurement,
+    updateSupplierCost, forceItemSupplier, updateItemMarkup, updateItemField, updateMeasurement,
     clearItemForm, handleCreateNewItem,
   } = useProtocolState([], [], suppliers, userRole);
 
@@ -328,7 +328,7 @@ export function useProtocolPage({
     handleAddItem, handleAddStockItem, handleReallocate,
     removeEstoqueItem, updateEstoqueItemQuantity, splitEstoqueItem,
     removeACotarItem, updateACotarItemQuantity, updateSupplierCost,
-    forceItemSupplier, toggleItemPurchased, updateItemMarkup, updateItemField, updateMeasurement, clearItemForm,
+    forceItemSupplier, updateItemMarkup, updateItemField, updateMeasurement, clearItemForm,
     handleCreateNewItem, allItems,
     isFormUnlocked, isItemFormValid, canFinalize, canSendToBling,
     handleSaveDraft, handleReservarEstoque, handleEnviarBling,

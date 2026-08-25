@@ -24,7 +24,8 @@ interface Props {
 
 export default function PainelComprasClient({ initialProtocols, suppliers, userRole }: Props) {
   const [protocols, setProtocols] = useState<any[]>(initialProtocols);
-  const [savingId, setSavingId] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [selectedItems, setSelectedItems] = useState<Record<string, string>>({}); // itemId -> protocolId
 
   // Parse raw protocols and group them
   const groupedData = useMemo(() => {
@@ -37,7 +38,7 @@ export default function PainelComprasClient({ initialProtocols, suppliers, userR
       
       // Filter items to buy
       const pendingItems = items.filter(
-        i => i.type === 'a_cotar' && i.isPurchased !== true
+        i => i.type === 'a_cotar' && i.status !== 'comprado'
       );
 
       if (pendingItems.length === 0) return;
@@ -88,38 +89,66 @@ export default function PainelComprasClient({ initialProtocols, suppliers, userR
     return Object.values(groups).sort((a, b) => a.supplierName.localeCompare(b.supplierName));
   }, [protocols, suppliers]);
 
-  // Handle toggling purchase status
-  const handleTogglePurchase = async (protocolId: string | number, itemId: string) => {
-    setSavingId(itemId);
+  // Handle batch purchasing
+  const handleBatchPurchase = async () => {
+    const itemIds = Object.keys(selectedItems);
+    if (itemIds.length === 0) return;
     
-    // Find the protocol
-    const protoIndex = protocols.findIndex(p => p.id === protocolId);
-    if (protoIndex === -1) {
-      setSavingId(null);
-      return;
-    }
+    setIsSaving(true);
     
-    const proto = protocols[protoIndex];
-    const newItems = (proto.items as ProtocolItem[]).map(i => {
-      if (i.id === itemId) {
-        return { ...i, isPurchased: true };
-      }
-      return i;
-    });
-
-    // Optimistic update
+    // Group by protocol
+    const protocolsToUpdate: Record<string, any> = {};
     const newProtocols = [...protocols];
-    newProtocols[protoIndex] = { ...proto, items: newItems };
-    setProtocols(newProtocols);
+    
+    for (const [itemId, protoId] of Object.entries(selectedItems)) {
+      if (!protocolsToUpdate[protoId]) {
+        const pIndex = newProtocols.findIndex(p => String(p.id) === String(protoId));
+        if (pIndex !== -1) {
+          protocolsToUpdate[protoId] = { index: pIndex, proto: { ...newProtocols[pIndex] } };
+        }
+      }
+    }
 
-    // Save to DB
-    const res = await saveProtocolAction({ ...proto, items: newItems });
-    if (!res.success) {
-      alert('Erro ao salvar no banco. A página será recarregada.');
+    // Apply updates locally and save
+    let hasError = false;
+    for (const protoId of Object.keys(protocolsToUpdate)) {
+      const { index, proto } = protocolsToUpdate[protoId];
+      
+      // Update items
+      const newItems = (proto.items as ProtocolItem[]).map(i => {
+        if (selectedItems[i.id]) {
+          return { ...i, status: 'comprado' };
+        }
+        return i;
+      });
+      
+      proto.items = newItems;
+      newProtocols[index] = proto;
+      
+      // Save protocol
+      const res = await saveProtocolAction(proto);
+      if (!res.success) {
+        hasError = true;
+      }
+    }
+
+    setProtocols(newProtocols);
+    setSelectedItems({});
+    setIsSaving(false);
+
+    if (hasError) {
+      alert('Erro ao salvar alguns protocolos. A página será recarregada.');
       window.location.reload();
     }
-    
-    setSavingId(null);
+  };
+
+  const toggleItemSelection = (itemId: string, protoId: string | number) => {
+    setSelectedItems(prev => {
+      const newSel = { ...prev };
+      if (newSel[itemId]) delete newSel[itemId];
+      else newSel[itemId] = String(protoId);
+      return newSel;
+    });
   };
 
   if (groupedData.length === 0) {
@@ -176,6 +205,12 @@ export default function PainelComprasClient({ initialProtocols, suppliers, userR
                       return (
                         <div key={item.id} className="flex flex-col md:flex-row md:items-center justify-between gap-4 rounded-xl border border-slate-100 bg-slate-50/50 p-3 hover:bg-slate-50 transition-colors">
                           <div className="flex items-center gap-3">
+                            <input
+                              type="checkbox"
+                              checked={!!selectedItems[item.id]}
+                              onChange={() => toggleItemSelection(item.id, p.protocolId)}
+                              className="h-5 w-5 rounded border-slate-300 text-brand focus:ring-brand cursor-pointer"
+                            />
                             <span className="text-xs font-bold text-slate-400 w-4">{idx + 1}.</span>
                             <div>
                               <div className="font-bold text-slate-800 text-sm flex items-center gap-2">
@@ -203,27 +238,10 @@ export default function PainelComprasClient({ initialProtocols, suppliers, userR
                             <div className="h-8 w-px bg-slate-200 hidden md:block" />
                             <div className="flex flex-col items-end min-w-[120px]">
                               <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">Custo Unit.</span>
-                              <span className="text-sm font-bold text-slate-700">{formatCurrency(item.unitPrice || 0)}</span>
+                              <span className="text-sm font-bold text-slate-700">
+                                {item.supplierCosts?.[group.supplierId] ? formatCurrency(item.supplierCosts[group.supplierId]) : formatCurrency(item.unitPrice || 0)}
+                              </span>
                             </div>
-                            
-                            <button
-                              type="button"
-                              onClick={() => handleTogglePurchase(p.protocolId, item.id)}
-                              disabled={savingId === item.id}
-                              className="bg-white border border-slate-200 text-slate-600 hover:text-emerald-600 hover:border-emerald-200 hover:bg-emerald-50 text-[11px] font-bold uppercase tracking-wider px-3 py-2 rounded-lg shadow-sm transition-all disabled:opacity-50 flex items-center gap-2"
-                            >
-                              {savingId === item.id ? (
-                                <svg className="w-4 h-4 animate-spin" fill="none" viewBox="0 0 24 24">
-                                  <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
-                                  <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
-                                </svg>
-                              ) : (
-                                <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                                </svg>
-                              )}
-                              Dar Baixa (Comprado)
-                            </button>
                           </div>
                         </div>
                       );
@@ -235,6 +253,33 @@ export default function PainelComprasClient({ initialProtocols, suppliers, userR
           </div>
         ))}
       </div>
+
+      {Object.keys(selectedItems).length > 0 && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-50 flex items-center gap-4 bg-slate-900 text-white px-6 py-4 rounded-2xl shadow-2xl border border-slate-700 animate-in slide-in-from-bottom-8">
+          <div className="flex flex-col">
+            <span className="text-xs text-slate-300 font-medium tracking-wide">Selecionados</span>
+            <span className="font-bold text-lg leading-tight">{Object.keys(selectedItems).length} itens</span>
+          </div>
+          <div className="h-8 w-px bg-slate-700" />
+          <button
+            onClick={handleBatchPurchase}
+            disabled={isSaving}
+            className="bg-brand hover:bg-brand/90 text-white font-bold py-2 px-6 rounded-xl transition-all shadow-lg shadow-brand/20 flex items-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+          >
+            {isSaving ? (
+              <svg className="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+            ) : (
+              <svg className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+              </svg>
+            )}
+            Dar Baixa em Tudo
+          </button>
+        </div>
+      )}
     </div>
   );
 }
