@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import Link from 'next/link';
 import { useParams } from 'next/navigation';
@@ -10,6 +10,7 @@ import type { Protocol } from '../../../lib/types/database';
 import { ItemFormState } from '../../../lib/config/protocolForm';
 import { useProtocolRealtime } from '../../../lib/hooks/useProtocolRealtime';
 import { useProtocolPage } from '../../../lib/hooks/useProtocolPage';
+import { useAuth } from '../../../context/AuthContext';
 import { HeaderProtocolo } from '../components/HeaderProtocolo';
 import { FormularioAdicaoItem } from '../components/FormularioAdicaoItem';
 import { TabelaEstoque } from '../components/TabelaEstoque';
@@ -22,6 +23,7 @@ import { FooterAcoes } from '../components/FooterAcoes';
 
 export default function ProtocolDetailPage() {
   const params = useParams<{ id: string }>();
+  const { user } = useAuth();
   const [isProtocolLoading, setIsProtocolLoading] = useState(true);
   const { stockProducts, stockLoading, registeredClients, clientsLoading } = useProtocolRealtime(
     !isNaN(Number(params?.id)) ? Number(params.id) : undefined
@@ -57,6 +59,7 @@ export default function ProtocolDetailPage() {
     reallocatableItems, insufficientStockItems,
     handleExceedStock, handleConfirmSplit,
     handleConfirmDeficit, handleConfirmRealloc, handleConfirmIgnore,
+    forceItemSupplier,
   } = useProtocolPage({
     protocolId: params?.id,
     initialViewing: true,
@@ -64,6 +67,7 @@ export default function ProtocolDetailPage() {
     registeredClients,
     stockProducts,
     suppliers,
+    userRole: user?.role,
   });
   useEffect(() => {
     if (params.id) {
@@ -145,11 +149,12 @@ export default function ProtocolDetailPage() {
       <TabelaCotacao items={aCotarItems} suppliers={suppliers} estoqueItemsCount={estoqueItems.length}
         updateQuantity={updateACotarItemQuantity} updateSupplierCost={updateSupplierCost}
         removeItem={removeACotarItem} updateItemMarkup={updateItemMarkup}
+        forceItemSupplier={forceItemSupplier} userRole={user?.role}
         handleReallocate={(id, qty) => handleReallocate(id, qty, stockProducts)}
         getFreeStock={identifier => getFreeStock(identifier, stockProducts)} isViewing={isViewing} />
       <FooterAcoes totals={totals} canFinalize={canFinalize} allItemsCount={countUniqueProtocolItems(allItems)}
         isViewing={isViewing} protocolStatus={protocolStatus} isLoading={isFinalizing}
-        canSendToBling={canSendToBling}
+        canSendToBling={canSendToBling} userRole={user?.role}
         onSaveDraft={() => triggerSaveCheck('draft')}
         onReservar={() => triggerSaveCheck('reservar')}
         onEnviarBling={() => triggerSaveCheck('enviar')}

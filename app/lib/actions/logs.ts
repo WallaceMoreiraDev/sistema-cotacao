@@ -7,18 +7,36 @@ export async function insertLogAction(protocolId: string | number, actionType: s
     const supabase = await createClient();
     const numericProtocolId = typeof protocolId === 'string' ? parseInt(protocolId.replace(/\D/g, ''), 10) : protocolId;
     
-    // We will hardcode a mock user for now as auth is phase 2
-    // If the action is approval/rejection, it's admin. Otherwise, it's a seller.
-    const isAdminAction = ['markup_approved', 'markup_rejected'].includes(actionType);
+    // Fallback if no user is found (e.g. cron jobs or webhooks)
+    let userName = 'Sistema';
+    let userRole = 'Automático';
+    let userSector = 'Backend';
+
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const { data: profile } = await supabase.from('profiles').select('full_name, role, job_title, department').eq('id', user.id).single();
+      if (profile) {
+        userName = profile.full_name || 'Usuário Desconhecido';
+        userRole = profile.job_title || profile.role || 'Membro';
+        userSector = profile.department || 'Geral';
+      }
+    } else {
+      const isAdminAction = ['markup_approved', 'markup_rejected'].includes(actionType);
+      if (isAdminAction) {
+        userName = 'Admin (Fallback)';
+        userRole = 'Gerente';
+        userSector = 'Diretoria';
+      }
+    }
     
     const { error } = await supabase.from('protocol_logs').insert({
       protocol_id: numericProtocolId,
       action_type: actionType,
       description,
       metadata: metadata || {},
-      user_name: isAdminAction ? 'Admin' : 'Vendedor',
-      user_role: isAdminAction ? 'Gerente' : 'Vendedor Externo',
-      user_sector: isAdminAction ? 'Diretoria' : 'Comercial'
+      user_name: userName,
+      user_role: userRole,
+      user_sector: userSector
     });
 
     if (error) {

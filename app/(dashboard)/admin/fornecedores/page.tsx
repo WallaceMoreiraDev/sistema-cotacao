@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { getSuppliersAction, createSupplierAction, deleteSupplierAction, SupplierRow } from '@/app/lib/actions/suppliers';
+import { getSuppliersAction, createSupplierAction, updateSupplierAction, deleteSupplierAction, SupplierRow } from '@/app/lib/actions/suppliers';
 import { toast } from 'react-hot-toast';
 
 export default function AdminFornecedoresPage() {
@@ -13,6 +13,12 @@ export default function AdminFornecedoresPage() {
 
   const [newName, setNewName] = useState('');
   const [newType, setNewType] = useState('Fornecedor Original');
+  const [newFreightCost, setNewFreightCost] = useState('');
+
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editName, setEditName] = useState('');
+  const [editType, setEditType] = useState('');
+  const [editFreightCost, setEditFreightCost] = useState('');
 
   const loadSuppliers = async () => {
     setIsLoading(true);
@@ -31,10 +37,12 @@ export default function AdminFornecedoresPage() {
     e.preventDefault();
     if (!newName.trim()) return;
     setIsSubmitting(true);
-    const res = await createSupplierAction(newName.trim(), newType);
+    const freightNum = parseFloat(newFreightCost) || 0;
+    const res = await createSupplierAction(newName.trim(), newType, freightNum);
     if (res.success) {
       toast.success('Fornecedor cadastrado!');
       setNewName('');
+      setNewFreightCost('');
       setIsAdding(false);
       loadSuppliers();
     } else {
@@ -47,6 +55,7 @@ export default function AdminFornecedoresPage() {
     setIsAdding(false);
     setNewName('');
     setNewType('Fornecedor Original');
+    setNewFreightCost('');
   };
 
   const handleDelete = async (id: string) => {
@@ -58,6 +67,33 @@ export default function AdminFornecedoresPage() {
     } else {
       toast.error('Erro ao excluir: ' + res.error);
     }
+  };
+
+  const startEdit = (sup: SupplierRow) => {
+    setEditingId(sup.id);
+    setEditName(sup.name);
+    setEditType(sup.type);
+    setEditFreightCost(sup.freight_cost ? sup.freight_cost.toString() : '');
+  };
+
+  const cancelEdit = () => {
+    setEditingId(null);
+  };
+
+  const handleUpdate = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingId || !editName.trim()) return;
+    setIsSubmitting(true);
+    const freightNum = parseFloat(editFreightCost) || 0;
+    const res = await updateSupplierAction(editingId, editName.trim(), editType, freightNum);
+    if (res.success) {
+      toast.success('Fornecedor atualizado!');
+      setEditingId(null);
+      loadSuppliers();
+    } else {
+      toast.error('Erro ao atualizar: ' + res.error);
+    }
+    setIsSubmitting(false);
   };
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -124,7 +160,7 @@ export default function AdminFornecedoresPage() {
             </div>
             
             <form onSubmit={handleCreate} className="space-y-6">
-              <div className="grid gap-5 sm:grid-cols-2">
+              <div className="grid gap-5 sm:grid-cols-3">
                 <div className="group">
                   <label className="block text-xs font-semibold text-slate-500 uppercase tracking-widest mb-2">
                     Nome da Empresa *
@@ -160,6 +196,23 @@ export default function AdminFornecedoresPage() {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
                       </svg>
                     </div>
+                  </div>
+                </div>
+
+                <div className="group">
+                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-widest mb-2">
+                    Frete Padrão (R$)
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      step="0.01"
+                      min="0"
+                      value={newFreightCost}
+                      onChange={(e) => setNewFreightCost(e.target.value)}
+                      placeholder="Ex: 50.00"
+                      className="block w-full rounded-xl border border-slate-200 bg-white py-3.5 px-4 text-sm font-semibold text-slate-800 outline-none transition-all placeholder:text-slate-400 placeholder:font-normal focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10 shadow-sm"
+                    />
                   </div>
                 </div>
               </div>
@@ -208,18 +261,68 @@ export default function AdminFornecedoresPage() {
                   <tr>
                     <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500">Fornecedor</th>
                     <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500">Tipo</th>
+                    <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500">Frete Fixo</th>
                     <th className="px-6 py-4 text-right text-xs font-bold uppercase tracking-wider text-slate-500">Ações</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {suppliers.filter(sup => sup.name.toLowerCase().includes(searchQuery.toLowerCase()) || sup.type.toLowerCase().includes(searchQuery.toLowerCase())).length === 0 ? (
                     <tr>
-                      <td colSpan={3} className="px-6 py-8 text-center text-slate-400">
+                      <td colSpan={4} className="px-6 py-8 text-center text-slate-400">
                         Nenhum fornecedor encontrado para "{searchQuery}".
                       </td>
                     </tr>
                   ) : (
                     suppliers.filter(sup => sup.name.toLowerCase().includes(searchQuery.toLowerCase()) || sup.type.toLowerCase().includes(searchQuery.toLowerCase())).map((sup) => (
+                      editingId === sup.id ? (
+                        <tr key={sup.id} className="bg-emerald-50/30">
+                          <td colSpan={4} className="p-4">
+                            <form onSubmit={handleUpdate} className="flex flex-col sm:flex-row gap-4 items-center">
+                              <input
+                                type="text"
+                                required
+                                value={editName}
+                                onChange={(e) => setEditName(e.target.value)}
+                                className="w-full sm:w-1/3 rounded-xl border border-slate-200 py-2 px-3 text-sm text-slate-900 focus:border-emerald-500 outline-none"
+                              />
+                              <select
+                                required
+                                value={editType}
+                                onChange={(e) => setEditType(e.target.value)}
+                                className="w-full sm:w-1/3 rounded-xl border border-slate-200 py-2 px-3 text-sm text-slate-900 focus:border-emerald-500 outline-none"
+                              >
+                                <option value="Fornecedor Original">Fornecedor Original</option>
+                                <option value="Mercado Local">Mercado Local</option>
+                              </select>
+                              <input
+                                type="number"
+                                step="0.01"
+                                min="0"
+                                value={editFreightCost}
+                                onChange={(e) => setEditFreightCost(e.target.value)}
+                                placeholder="Frete Fixo"
+                                className="w-full sm:w-1/4 rounded-xl border border-slate-200 py-2 px-3 text-sm text-slate-900 focus:border-emerald-500 outline-none"
+                              />
+                              <div className="flex gap-2 whitespace-nowrap ml-auto">
+                                <button
+                                  type="button"
+                                  onClick={cancelEdit}
+                                  className="text-xs font-bold text-slate-500 hover:text-slate-800 px-3 py-1.5 rounded-xl border border-slate-200"
+                                >
+                                  Cancelar
+                                </button>
+                                <button
+                                  type="submit"
+                                  disabled={isSubmitting}
+                                  className="text-xs font-bold text-white bg-emerald-600 hover:bg-emerald-700 px-3 py-1.5 rounded-xl disabled:opacity-50 shadow-sm"
+                                >
+                                  {isSubmitting ? 'Salvando...' : 'Salvar'}
+                                </button>
+                              </div>
+                            </form>
+                          </td>
+                        </tr>
+                      ) : (
                       <tr key={sup.id} className="hover:bg-slate-50/50 transition-colors group">
                         <td className="px-6 py-4 whitespace-nowrap">
                           <div className="font-bold text-sm text-slate-900">{sup.name}</div>
@@ -234,7 +337,21 @@ export default function AdminFornecedoresPage() {
                             {sup.type}
                           </span>
                         </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm font-bold text-slate-700">
+                            {sup.freight_cost ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(sup.freight_cost) : '-'}
+                          </div>
+                        </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right space-x-2">
+                          <button
+                            onClick={() => startEdit(sup)}
+                            className="inline-flex items-center gap-1 text-xs font-bold text-slate-400 hover:text-emerald-600 hover:bg-emerald-50 px-3 py-1.5 rounded-xl transition-all"
+                          >
+                            <svg className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                            </svg>
+                            Editar
+                          </button>
                           <button
                             onClick={() => handleDelete(sup.id)}
                             className="inline-flex items-center gap-1 text-xs font-bold text-slate-400 hover:text-red-600 hover:bg-red-50 px-3 py-1.5 rounded-xl transition-all"
@@ -246,6 +363,7 @@ export default function AdminFornecedoresPage() {
                           </button>
                         </td>
                       </tr>
+                      )
                     ))
                   )}
                 </tbody>

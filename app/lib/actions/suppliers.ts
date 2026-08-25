@@ -8,6 +8,7 @@ export interface SupplierRow {
   name: string;
   type: 'Mercado Local' | 'Fornecedor Original';
   created_at: string;
+  freight_cost?: number;
 }
 
 export async function getSuppliersAction() {
@@ -29,7 +30,7 @@ export async function getSuppliersAction() {
   }
 }
 
-export async function createSupplierAction(name: string, type: string) {
+export async function createSupplierAction(name: string, type: string, freightCost: number = 0) {
   try {
     const supabase = await createClient();
     // Generate a simple ID from name
@@ -37,7 +38,7 @@ export async function createSupplierAction(name: string, type: string) {
     
     const { error } = await supabase
       .from('suppliers')
-      .insert([{ id, name, type }]);
+      .insert([{ id, name, type, freight_cost: freightCost }]);
 
     if (error) {
       return { success: false, error: error.message };
@@ -56,6 +57,25 @@ export async function deleteSupplierAction(id: string) {
     const { error } = await supabase
       .from('suppliers')
       .delete()
+      .eq('id', id);
+
+    if (error) {
+      return { success: false, error: error.message };
+    }
+    
+    revalidatePath('/admin/fornecedores');
+    return { success: true };
+  } catch (error: any) {
+    return { success: false, error: error.message };
+  }
+}
+
+export async function updateSupplierAction(id: string, name: string, type: string, freightCost: number = 0) {
+  try {
+    const supabase = await createClient();
+    const { error } = await supabase
+      .from('suppliers')
+      .update({ name, type, freight_cost: freightCost })
       .eq('id', id);
 
     if (error) {

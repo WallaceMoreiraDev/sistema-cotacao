@@ -14,6 +14,8 @@ interface TabelaCotacaoProps {
   updateItemMarkup: (itemId: string, value: string) => void;
   handleReallocate: (id: string, maxQty: number) => void;
   getFreeStock: (identifier: string) => number;
+  forceItemSupplier?: (itemId: string, supplierId: string | null) => void;
+  userRole?: string;
   isViewing?: boolean;
 }
 
@@ -27,8 +29,11 @@ export function TabelaCotacao({
   updateItemMarkup,
   handleReallocate,
   getFreeStock,
+  forceItemSupplier,
+  userRole,
   isViewing = false,
 }: TabelaCotacaoProps) {
+  const isAdmin = userRole === 'admin';
   const [unlockedItems, setUnlockedItems] = useState<Set<string>>(new Set());
 
   const handleUnlock = (id: string) => {
@@ -60,7 +65,9 @@ export function TabelaCotacao({
             const canReallocate = freeStock > 0;
             const isApproved = item.approvalStatus === 'approved';
             const isRejected = item.approvalStatus === 'rejected';
-            const isLocked = isApproved || isRejected;
+            // Lock only appears when the item actually went through an approval flow.
+            // Normal-markup items (needsApproval=false) should never show any lock/badge.
+            const isLocked = item.needsApproval && (isApproved || isRejected);
             const isUnlocked = unlockedItems.has(item.id);
             const disableMarkup = isViewing || (!isUnlocked && isLocked);
             
@@ -73,6 +80,16 @@ export function TabelaCotacao({
                 cheapestSupplierId = cheapest[0];
               }
             }
+
+            // Determinar tipo de fornecedor vencedor para mostrar o placeholder
+            let winnerType: 'Fornecedor Original' | 'Mercado Local' = 'Fornecedor Original';
+            if (!item.costPrice && cheapestSupplierId) {
+              const sup = suppliers.find(s => String(s.id) === cheapestSupplierId);
+              if (sup && (sup.type === 'Fornecedor Original' || sup.type === 'Mercado Local')) {
+                winnerType = sup.type;
+              }
+            }
+            const expectedMarkup = getDefaultMarkup(winnerType);
 
             return (
               <div key={item.id} className="flex flex-col rounded-xl border border-slate-200 bg-white overflow-hidden shadow-sm transition-shadow hover:shadow-md">
@@ -142,16 +159,36 @@ export function TabelaCotacao({
                           <label className={`text-[11px] font-semibold truncate ${isCheapest ? 'text-emerald-700' : 'text-slate-700'}`} title={sup.name}>
                             {sup.name}
                           </label>
-                          <span className={`text-[9px] mb-1 ${isCheapest ? 'text-emerald-600 font-bold' : 'text-slate-400'}`}>
-                            {sup.type === 'Fornecedor Original' ? '(F. Orig)' : '(M. Loc)'}
-                            {isCheapest && ' 🏆'}
-                          </span>
+                          <div className="flex items-center justify-between mb-1">
+                            <span className={`text-[9px] ${isCheapest ? 'text-emerald-600 font-bold' : 'text-slate-400'}`}>
+                              {sup.type === 'Fornecedor Original' ? '(F. Orig)' : '(M. Loc)'}
+                              {isCheapest && !item.forcedSupplierId && ' 🏆'}
+                              {item.forcedSupplierId === String(sup.id) && ' 🔒'}
+                            </span>
+                            
+                            {isAdmin && !item.costPrice && !isViewing && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  if (forceItemSupplier) {
+                                    forceItemSupplier(item.id, item.forcedSupplierId === String(sup.id) ? null : String(sup.id));
+                                  }
+                                }}
+                                title={item.forcedSupplierId === String(sup.id) ? 'Remover trava' : 'Forçar este fornecedor'}
+                                className={`text-[10px] p-0.5 rounded transition ${item.forcedSupplierId === String(sup.id) ? 'text-brand bg-brand/10 hover:bg-brand/20' : 'text-slate-400 hover:text-brand hover:bg-slate-100'}`}
+                              >
+                                <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
+                                  <path fillRule="evenodd" d="M10 2a1 1 0 011 1v1.323l3.954 1.582 1.599-.8a1 1 0 01.894 1.79l-1.233.616 1.738 5.42a1 1 0 01-.285 1.05A3.989 3.989 0 0115 15a3.989 3.989 0 01-2.667-1.019 1 1 0 01-.285-1.05l1.715-5.349L11 6.477V16h2a1 1 0 110 2H7a1 1 0 110-2h2V6.477L6.237 7.582l1.715 5.349a1 1 0 01-.285 1.05A3.989 3.989 0 015 15a3.989 3.989 0 01-2.667-1.019 1 1 0 01-.285-1.05l1.738-5.42-1.233-.617a1 1 0 01.894-1.788l1.599.799L9 4.323V3a1 1 0 011-1z" clipRule="evenodd" />
+                                </svg>
+                              </button>
+                            )}
+                          </div>
                           <input
                             type="number"
                             placeholder="R$ 0,00"
                             value={item.supplierCosts?.[sup.id] || ''}
                             onChange={(e) => updateSupplierCost(item.id, String(sup.id), parseFloat(e.target.value))}
-                            className={`w-full rounded border py-1.5 px-2 text-sm text-center transition-colors focus:ring-1 focus:outline-none ${isCheapest ? 'border-emerald-500 bg-emerald-50 text-emerald-900 shadow-sm ring-emerald-500' : 'border-slate-200 text-slate-900 bg-white'}`}
+                            className={`w-full rounded border py-1.5 px-2 text-sm text-center transition-colors focus:ring-1 focus:outline-none ${isCheapest || item.forcedSupplierId === String(sup.id) ? 'border-emerald-500 bg-emerald-50 text-emerald-900 shadow-sm ring-emerald-500' : 'border-slate-200 text-slate-900 bg-white'}`}
                           />
                         </div>
                       )
@@ -167,7 +204,7 @@ export function TabelaCotacao({
                     {item.costPrice && item.costPrice > 0 ? (
                       <span className="text-[10px] font-bold text-amber-700 bg-amber-100 px-2 py-1 rounded flex items-center gap-1 border border-amber-200 shadow-sm" title="O custo base desta linha está usando o custo do estoque porque existem unidades em estoque. Os custos dos fornecedores serão salvos apenas para histórico.">
                         <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
-                        Venda travada pelo custo do estoque ({formatCurrency(item.costPrice)})
+                        Venda travada pelo custo do estoque
                       </span>
                     ) : (
                       <div className="text-[11px] text-slate-400 font-medium italic">Sem custo base travado</div>
@@ -186,12 +223,42 @@ export function TabelaCotacao({
 
                   {/* Right: Financeiro */}
                   <div className="flex flex-col md:flex-row items-end md:items-center gap-4 md:gap-6">
+                    {isAdmin && item.finalTotal && item.finalTotal > 0 && (
+                      <div className="flex items-center gap-3 bg-white px-3 py-1.5 rounded-lg border border-slate-200/60 shadow-sm text-[9px] text-slate-500 hidden xl:flex">
+                        <div className="flex flex-col" title="Custo Fornecedor = Custo Unitário × Qtde">
+                          <span className="font-bold text-slate-400 uppercase">Custo Forn. Total</span>
+                          <span className="text-slate-700 font-medium">{formatCurrency((item.unitPrice || 0) * Number(item.quantity))}</span>
+                        </div>
+                        <div className="h-6 w-px bg-slate-200" />
+                        <div className="flex flex-col" title="Subtotal Base = Preço Base Venda × Qtde">
+                          <span className="font-bold text-slate-400 uppercase">Sub. Base (Venda)</span>
+                          <span className="text-slate-700 font-medium">{formatCurrency(item.baseSubtotal || 0)}</span>
+                        </div>
+                        <div className="h-6 w-px bg-slate-200" />
+                        <div className="flex flex-col" title="Imposto de 4,5%">
+                          <span className="font-bold text-slate-400 uppercase">+ Imposto</span>
+                          <span className="text-rose-600 font-medium">{formatCurrency(item.taxAmount || 0)}</span>
+                        </div>
+                        <div className="h-6 w-px bg-slate-200" />
+                        <div className="flex flex-col" title="Rateio de Frete Padrão">
+                          <span className="font-bold text-slate-400 uppercase">+ Frete</span>
+                          <span className="text-amber-600 font-medium">{formatCurrency(item.freightAmount || 0)}</span>
+                        </div>
+                        <div className="h-6 w-px bg-slate-200" />
+                        <div className="flex flex-col">
+                          <span className="font-bold text-slate-400 uppercase">= Final</span>
+                          <span className="text-brand font-bold">{formatCurrency(item.finalTotal || 0)}</span>
+                        </div>
+                      </div>
+                    )}
+
                     <div className="flex items-center gap-2">
                       <div className="flex flex-col items-end gap-1">
                         <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
                           Markup %
                         </label>
-                        {(item.needsApproval || isRejected) && (
+                        {/* Only show approval badge when the item actually went through the approval flow */}
+                        {item.needsApproval && (
                           <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${isApproved ? 'bg-emerald-100 text-emerald-700' : isRejected ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>
                             {isApproved ? '✅ Aprovado' : isRejected ? '❌ Rejeitado' : '⚠️ Requer Aprovação'}
                           </span>
@@ -200,6 +267,7 @@ export function TabelaCotacao({
                       <div className="relative group">
                         <input
                           type="number"
+                          placeholder={`Padrão: ${expectedMarkup}%`}
                           value={item.markupPercent ?? ''}
                           onChange={(e) => updateItemMarkup(item.id, e.target.value)}
                           disabled={disableMarkup}

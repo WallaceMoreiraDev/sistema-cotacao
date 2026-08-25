@@ -29,10 +29,21 @@ export function addItemToProtocol(protocol: Protocol, item: ProtocolItem): Proto
 export function calculateTotals(items: ProtocolItem[]) {
   let totalEstoque = 0;
   let totalACotar = 0;
+  
+  let totalCost = 0;
+  let totalBaseSubtotal = 0;
+  let totalTax = 0;
+  let totalFreight = 0;
 
   for (const item of items) {
     const sale = (item.salePrice ?? 0) * item.quantity;
+    const cost = (item.unitPrice ?? 0) * item.quantity;
     
+    totalCost += cost;
+    totalBaseSubtotal += (item.baseSubtotal || 0);
+    totalTax += (item.taxAmount || 0);
+    totalFreight += (item.freightAmount || 0);
+
     if (item.type === 'estoque') {
       totalEstoque += sale;
     } else {
@@ -44,5 +55,5 @@ export function calculateTotals(items: ProtocolItem[]) {
   const subtotal = totalEstoque + totalACotar;
   const total = subtotal; // markup already baked into each item's salePrice
 
-  return { subtotal, markup: 0, total, totalEstoque, totalACotar };
+  return { subtotal, markup: 0, total, totalEstoque, totalACotar, totalCost, totalBaseSubtotal, totalTax, totalFreight };
 }

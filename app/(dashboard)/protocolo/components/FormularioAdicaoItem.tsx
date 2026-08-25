@@ -359,7 +359,7 @@ export function FormularioAdicaoItem({
                             step="any"
                             value={localQuantities[product.id] || '1'}
                             onChange={(e) => setLocalQuantities(prev => ({ ...prev, [product.id]: e.target.value }))}
-                            className="w-14 text-xs border border-slate-200 rounded px-1.5 py-1 text-center font-medium focus:ring-1 focus:ring-brand focus:border-brand shadow-sm"
+                            className="w-14 text-xs text-slate-900 border border-slate-200 rounded px-1.5 py-1 text-center font-medium focus:ring-1 focus:ring-brand focus:border-brand shadow-sm"
                             placeholder="Qtd"
                             title="Quantidade"
                           />

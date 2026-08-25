@@ -28,6 +28,7 @@ function mapRowToProtocolItem(row: any): ProtocolItem {
     needsApproval: Boolean(row.needs_approval),
     approvalStatus: row.approval_status || 'pending',
     supplierCosts: row.supplier_costs || {},
+    productId: row.product_id || undefined,
   };
 }
 
@@ -149,6 +150,16 @@ export async function saveProtocolAction(protocol: Protocol, options?: { skipDif
   try {
     const supabase = await createClient();
 
+    // Check if the current user is an admin
+    let isAdmin = false;
+    const { data: { user } } = await supabase.auth.getUser();
+    if (user) {
+      const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
+      if (profile && profile.role === 'admin') {
+        isAdmin = true;
+      }
+    }
+
     // Calculate total sale price
     const totalVenda = protocol.totals?.total ?? 0;
 
@@ -249,7 +260,7 @@ export async function saveProtocolAction(protocol: Protocol, options?: { skipDif
         let finalMarkup = item.markupPercent ?? null;
         let finalSalePrice = item.salePrice ?? 0;
         let finalNeedsApproval = item.needsApproval ?? false;
-        let finalApprovalStatus = item.approvalStatus || 'pending';
+        let finalApprovalStatus: string = item.approvalStatus || 'pending';
 
         if (!isTempItemId && !item.isMarkupDirty && existingItems) {
           const dbItem = existingItems.find(e => e.id === itemId);
@@ -258,6 +269,44 @@ export async function saveProtocolAction(protocol: Protocol, options?: { skipDif
             finalSalePrice = dbItem.sale_price;
             finalNeedsApproval = dbItem.needs_approval;
             finalApprovalStatus = dbItem.approval_status;
+          }
+        }
+
+        // SERVER-SIDE GUARD: recalculate needs_approval from the actual markup value.
+        // ANY deviation from the default requires approval — above OR below.
+        if (finalMarkup !== null && finalMarkup !== undefined) {
+          const MERCADO_LOCAL_SUPPLIER_IDS = ['vedpira']; // add more IDs here if needed
+          const isLocalSupplier = item.supplierId && MERCADO_LOCAL_SUPPLIER_IDS.includes(String(item.supplierId));
+          const defaultMkForSupplier = isLocalSupplier ? 30 : 70;
+          
+          // ANY deviation from the exact default requires manager approval
+          const serverNeedsApproval = finalMarkup !== defaultMkForSupplier;
+          
+          // ADMIN BYPASS: if the user saving the protocol is an admin, they are never subject to approval
+          if (isAdmin) {
+            finalNeedsApproval = false;
+            finalApprovalStatus = 'approved';
+          } else {
+            finalNeedsApproval = serverNeedsApproval;
+
+            if (serverNeedsApproval) {
+              // Only keep 'approved' if admin already approved AND the markup hasn't changed since then.
+              // If the markup value changed, the old approval is for a different value and must be invalidated.
+              const dbItem = existingItems?.find(e => e.id === itemId);
+              const wasAdminApproved = dbItem?.approval_status === 'approved' && dbItem?.needs_approval === true;
+              const markupUnchangedSinceApproval = wasAdminApproved && dbItem?.markup_percent === finalMarkup;
+              
+              if (markupUnchangedSinceApproval) {
+                finalApprovalStatus = 'approved'; // same value admin approved — keep it
+              } else {
+                // Either never approved, or markup changed since approval — needs new approval
+                finalApprovalStatus = 'pending';
+              }
+            } else {
+              // Exact default markup — no approval needed
+              finalApprovalStatus = 'approved';
+              finalNeedsApproval = false;
+            }
           }
         }
 
@@ -281,6 +330,7 @@ export async function saveProtocolAction(protocol: Protocol, options?: { skipDif
           needs_approval: finalNeedsApproval,
           approval_status: finalApprovalStatus,
           supplier_costs: item.supplierCosts || {},
+          product_id: item.productId || null,
         };
       });
 

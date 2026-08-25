@@ -98,9 +98,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
       setTimeout(() => {
         if (isMounted) {
-          if (event !== 'INITIAL_SESSION') {
-             setIsLoading(true);
-          }
+          // We shouldn't set isLoading(true) here because it unmounts the entire app.
+          // Supabase triggers events like 'SIGNED_IN' or 'TOKEN_REFRESHED' when switching tabs.
+          // Fetching silently in the background prevents the page from "reloading".
           fetchProfileAndSetUser(session, isMounted);
         }
       }, 0);

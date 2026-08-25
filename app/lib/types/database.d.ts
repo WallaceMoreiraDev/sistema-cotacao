@@ -77,6 +77,12 @@ export interface ProtocolItem {
   productId?: string; // ID from stock products for synchronization
   // ── Supplier Costs ──
   supplierCosts?: Record<string, number>; // Maps supplier ID to cost
+  forcedSupplierId?: string; // ID of the supplier explicitly forced by the admin
+  // ── Cost Breakdown (Admin View) ──
+  baseSubtotal?: number;
+  taxAmount?: number;
+  freightAmount?: number;
+  finalTotal?: number;
 }
 
 // ─── Protocol ───
@@ -92,6 +98,10 @@ export interface Protocol {
     subtotal: number;
     markup: number;
     total: number;
+    // ── Detailed Totals (Admin View) ──
+    totalBaseSubtotal?: number;
+    totalTax?: number;
+    totalFreight?: number;
   };
   draftForm?: any; // To hold the unsubmitted item form state
 }

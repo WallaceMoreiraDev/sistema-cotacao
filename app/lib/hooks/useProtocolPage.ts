@@ -26,6 +26,7 @@ interface UseProtocolPageOptions {
   stockProducts: StockProduct[];
   suppliers: any[];
   navigateAfterSave?: boolean;
+  userRole?: string;
 }
 
 export function useProtocolPage({
@@ -36,6 +37,7 @@ export function useProtocolPage({
   stockProducts,
   suppliers,
   navigateAfterSave = false,
+  userRole,
 }: UseProtocolPageOptions) {
   const router = useRouter();
 
@@ -59,9 +61,9 @@ export function useProtocolPage({
     handleAddItem, handleAddStockItem, handleReallocate,
     removeEstoqueItem, updateEstoqueItemQuantity, splitEstoqueItem,
     splitMultipleEstoqueItems, removeACotarItem, updateACotarItemQuantity,
-    updateSupplierCost, updateItemMarkup, updateItemField, updateMeasurement,
+    updateSupplierCost, forceItemSupplier, updateItemMarkup, updateItemField, updateMeasurement,
     clearItemForm, handleCreateNewItem,
-  } = useProtocolState([], [], suppliers);
+  } = useProtocolState([], [], suppliers, userRole);
 
   const allItems = useMemo(() => [...estoqueItems, ...aCotarItems], [estoqueItems, aCotarItems]);
 
@@ -326,7 +328,7 @@ export function useProtocolPage({
     handleAddItem, handleAddStockItem, handleReallocate,
     removeEstoqueItem, updateEstoqueItemQuantity, splitEstoqueItem,
     removeACotarItem, updateACotarItemQuantity, updateSupplierCost,
-    updateItemMarkup, updateItemField, updateMeasurement, clearItemForm,
+    forceItemSupplier, updateItemMarkup, updateItemField, updateMeasurement, clearItemForm,
     handleCreateNewItem, allItems,
     isFormUnlocked, isItemFormValid, canFinalize, canSendToBling,
     handleSaveDraft, handleReservarEstoque, handleEnviarBling,

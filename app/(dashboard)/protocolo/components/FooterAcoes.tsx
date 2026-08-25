@@ -1,7 +1,10 @@
 import { formatCurrency } from '../../../lib/utils/protocolFormatters';
 
 interface FooterAcoesProps {
-  totals: { totalEstoque: number; totalACotar: number; total: number; subtotal: number; markup: number };
+  totals: { 
+    totalEstoque: number; totalACotar: number; total: number; subtotal: number; markup: number;
+    totalCost?: number; totalBaseSubtotal?: number; totalTax?: number; totalFreight?: number;
+  };
   canFinalize: boolean;
   allItemsCount: number;
   isViewing?: boolean;
@@ -14,6 +17,7 @@ interface FooterAcoesProps {
   onCancelar: () => void;
   onEstornar?: () => void;
   onRestaurar?: () => void;
+  userRole?: string;
 }
 
 export function FooterAcoes({
@@ -30,24 +34,52 @@ export function FooterAcoes({
   onCancelar,
   onEstornar,
   onRestaurar,
+  userRole,
 }: FooterAcoesProps) {
+  const isAdmin = userRole === 'admin';
   return (
     <div className="rounded-2xl border border-slate-200/80 bg-white p-5 shadow-sm">
       <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
-        <div className="flex items-center gap-6">
-          <div>
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Total Estoque</p>
-            <p className="text-lg font-bold text-slate-900">{formatCurrency(totals.totalEstoque ?? 0)}</p>
-          </div>
-          <div className="text-slate-300 text-lg font-light">+</div>
-          <div>
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Total a Cotar</p>
-            <p className="text-lg font-bold text-slate-900">{formatCurrency(totals.totalACotar ?? 0)}</p>
-          </div>
-          <div className="text-slate-300 text-lg font-light">=</div>
-          <div>
-            <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Preço de Venda Total</p>
-            <p className="text-xl font-black text-[#F7C00C]">{formatCurrency(totals.total)}</p>
+        <div className="flex items-center gap-4 flex-wrap">
+          {isAdmin && (
+            <div className="flex items-center gap-3 bg-slate-50 px-4 py-2 rounded-xl border border-slate-200/80 shadow-sm text-xs text-slate-500 mr-4">
+              <div className="flex flex-col">
+                <span className="font-bold text-slate-400 uppercase">Custo Forn. Total</span>
+                <span className="text-slate-700 font-bold">{formatCurrency(totals.totalCost || 0)}</span>
+              </div>
+              <div className="h-6 w-px bg-slate-200" />
+              <div className="flex flex-col">
+                <span className="font-bold text-slate-400 uppercase">Tot. Base (Venda)</span>
+                <span className="text-slate-700 font-bold">{formatCurrency(totals.totalBaseSubtotal || 0)}</span>
+              </div>
+              <div className="h-6 w-px bg-slate-200" />
+              <div className="flex flex-col">
+                <span className="font-bold text-slate-400 uppercase">+ Tot. Imposto</span>
+                <span className="text-rose-600 font-bold">{formatCurrency(totals.totalTax || 0)}</span>
+              </div>
+              <div className="h-6 w-px bg-slate-200" />
+              <div className="flex flex-col">
+                <span className="font-bold text-slate-400 uppercase">+ Tot. Frete</span>
+                <span className="text-amber-600 font-bold">{formatCurrency(totals.totalFreight || 0)}</span>
+              </div>
+            </div>
+          )}
+
+          <div className="flex gap-6 items-center">
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Total Estoque</p>
+              <p className="text-lg font-bold text-slate-900">{formatCurrency(totals.totalEstoque ?? 0)}</p>
+            </div>
+            <div className="text-slate-300 text-lg font-light">+</div>
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Total a Cotar</p>
+              <p className="text-lg font-bold text-slate-900">{formatCurrency(totals.totalACotar ?? 0)}</p>
+            </div>
+            <div className="text-slate-300 text-lg font-light">=</div>
+            <div>
+              <p className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">Preço de Venda Total</p>
+              <p className="text-xl font-black text-[#F7C00C]">{formatCurrency(totals.total)}</p>
+            </div>
           </div>
         </div>
 

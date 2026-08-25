@@ -12,7 +12,7 @@ export function getItemIdentifier(item: any): string {
   return item.code || item.sku || item.name || '';
 }
 
-export function useProtocolState(initialEstoque: ProtocolItem[] = [], initialACotar: ProtocolItem[] = [], suppliers: SupplierRow[] = []) {
+export function useProtocolState(initialEstoque: ProtocolItem[] = [], initialACotar: ProtocolItem[] = [], suppliers: SupplierRow[] = [], userRole?: string) {
   const [estoqueItems, setEstoqueItems] = useState<ProtocolItem[]>(initialEstoque);
   const [aCotarItems, setACotarItems] = useState<ProtocolItem[]>(initialACotar);
   const [itemCounter, setItemCounter] = useState(0);
@@ -214,6 +214,7 @@ export function useProtocolState(initialEstoque: ProtocolItem[] = [], initialACo
           markupPercent: 70,
           salePrice: (match.costPrice || 0) * 1.7,
           unitPrice: match.costPrice || 0,
+          productId: match.id,
         };
         setACotarItems(prev => {
           const existingIdx = prev.findIndex(i => areItemsMatching(i, quotedItem));
@@ -260,6 +261,7 @@ export function useProtocolState(initialEstoque: ProtocolItem[] = [], initialACo
         measurements: match.measurements || {},
         markupPercent: isMisto ? 70 : undefined,
         salePrice: isMisto ? (match.costPrice || 0) * 1.7 : 0,
+        productId: match.id,
       };
       setACotarItems(prev => {
         const existingIdx = prev.findIndex(i => areItemsMatching(i, quotedItem));
@@ -543,13 +545,20 @@ export function useProtocolState(initialEstoque: ProtocolItem[] = [], initialACo
         const hasStockCost = (item.costPrice ?? 0) > 0;
         
         const validEntries = Object.entries(newCosts).filter(([_, v]) => v > 0);
-        let cheapestSupplierId: string | null = null;
+        let activeSupplierId: string | null = null;
         let baseCost = 0;
         
         if (validEntries.length > 0) {
-          const cheapest = validEntries.reduce((min, current) => current[1] < min[1] ? current : min);
-          cheapestSupplierId = cheapest[0];
-          baseCost = cheapest[1];
+          if (item.forcedSupplierId && newCosts[item.forcedSupplierId]) {
+            // Respect forced supplier
+            activeSupplierId = item.forcedSupplierId;
+            baseCost = newCosts[activeSupplierId];
+          } else {
+            // Find cheapest
+            const cheapest = validEntries.reduce((min, current) => current[1] < min[1] ? current : min);
+            activeSupplierId = cheapest[0];
+            baseCost = cheapest[1];
+          }
         }
 
         if (hasStockCost) {
@@ -557,77 +566,162 @@ export function useProtocolState(initialEstoque: ProtocolItem[] = [], initialACo
         }
 
         let supplierType: 'Fornecedor Original' | 'Mercado Local' = 'Fornecedor Original'; // Fallback
-        if (!hasStockCost && cheapestSupplierId) {
-          const sup = suppliers.find(s => String(s.id) === cheapestSupplierId);
+        if (!hasStockCost && activeSupplierId) {
+          const sup = suppliers.find(s => String(s.id) === activeSupplierId);
           if (sup && (sup.type === 'Fornecedor Original' || sup.type === 'Mercado Local')) {
             supplierType = sup.type;
           }
         }
 
         const defaultMk = getDefaultMarkup(supplierType);
-        const mk = item.markupPercent !== undefined && item.markupPercent !== null ? item.markupPercent : defaultMk;
+        
+        // Se tem custo de estoque (misto), NÃO mudamos o markup por causa de fornecedor.
+        const winnerChanged = !hasStockCost && activeSupplierId && item.supplierId !== activeSupplierId;
+        const mk = winnerChanged ? defaultMk : (item.markupPercent !== undefined && item.markupPercent !== null ? item.markupPercent : defaultMk);
+        
         const salePrice = baseCost * (1 + mk / 100);
+        
+        // Recalculate approvalStatus 
+        // ADMIN BYPASS: if user is admin, markup deviations do not require approval
+        const isAdmin = userRole === 'admin';
+        const needsApproval = isAdmin ? false : (mk !== defaultMk);
+        let approvalStatus = item.approvalStatus;
+        if (winnerChanged || mk !== item.markupPercent || isAdmin) {
+          approvalStatus = needsApproval ? 'pending' : 'approved';
+        }
+
+        // Se for misto, não marcamos markup sujo ao mudar fornecedor (só suja se mexer direto no input de markup)
+        const stateChanged = winnerChanged || mk !== item.markupPercent || approvalStatus !== item.approvalStatus;
 
         return { 
           ...item, 
           supplierCosts: newCosts, 
+          supplierId: activeSupplierId || item.supplierId,
           unitPrice: baseCost, 
           markupPercent: mk,
+          needsApproval,
+          approvalStatus,
+          isMarkupDirty: item.isMarkupDirty || stateChanged,
           salePrice 
         };
       })
     );
-  }, [suppliers]);
+  }, [suppliers, userRole]);
+
+  const forceItemSupplier = useCallback((itemId: string, supplierId: string | null) => {
+    setACotarItems(prev => prev.map(item => {
+      if (item.id !== itemId) return item;
+      
+      const newForced = supplierId;
+      let activeSupplierId: string | null = null;
+      let baseCost = 0;
+      
+      const validEntries = Object.entries(item.supplierCosts || {}).filter(([_, v]) => v > 0);
+      if (validEntries.length > 0) {
+        if (newForced && (item.supplierCosts || {})[newForced]) {
+          activeSupplierId = newForced;
+          baseCost = (item.supplierCosts || {})[newForced];
+        } else {
+          const cheapest = validEntries.reduce((min, current) => current[1] < min[1] ? current : min);
+          activeSupplierId = cheapest[0];
+          baseCost = cheapest[1];
+        }
+      }
+
+      const hasStockCost = (item.costPrice ?? 0) > 0;
+      if (hasStockCost) {
+        baseCost = item.costPrice!;
+      }
+
+      let supplierType: 'Fornecedor Original' | 'Mercado Local' = 'Fornecedor Original';
+      if (!hasStockCost && activeSupplierId) {
+        const sup = suppliers.find(s => String(s.id) === activeSupplierId);
+        if (sup && (sup.type === 'Fornecedor Original' || sup.type === 'Mercado Local')) {
+          supplierType = sup.type;
+        }
+      }
+
+      const defaultMk = getDefaultMarkup(supplierType);
+      const winnerChanged = !hasStockCost && activeSupplierId && item.supplierId !== activeSupplierId;
+      const mk = winnerChanged ? defaultMk : (item.markupPercent !== undefined && item.markupPercent !== null ? item.markupPercent : defaultMk);
+      
+      const salePrice = baseCost * (1 + mk / 100);
+      const isAdmin = userRole === 'admin';
+      const needsApproval = isAdmin ? false : (mk !== defaultMk);
+      let approvalStatus = item.approvalStatus;
+      if (winnerChanged || mk !== item.markupPercent || isAdmin) {
+        approvalStatus = needsApproval ? 'pending' : 'approved';
+      }
+
+      const stateChanged = winnerChanged || mk !== item.markupPercent || approvalStatus !== item.approvalStatus;
+
+      return {
+        ...item,
+        forcedSupplierId: newForced || undefined,
+        supplierId: activeSupplierId || item.supplierId,
+        unitPrice: baseCost,
+        markupPercent: mk,
+        needsApproval,
+        approvalStatus,
+        isMarkupDirty: item.isMarkupDirty || stateChanged,
+        salePrice
+      };
+    }));
+  }, [suppliers, userRole]);
 
 
   const updateItemMarkup = useCallback((itemId: string, value: string) => {
     const isReset = value.trim() === '';
+    // Reject mid-typing states like '-', '.', '-.' that aren't valid numbers yet
+    const parsed = parseFloat(value);
+    if (!isReset && value.trim() !== '' && isNaN(parsed)) return;
     
-    setACotarItems(prev =>
-      prev.map(item => {
-        if (item.id !== itemId) return item;
+    setACotarItems(prev => {
+      const itemIdx = prev.findIndex(i => i.id === itemId);
+      if (itemIdx === -1) return prev;
+      const item = prev[itemIdx];
 
-        const validEntries = Object.entries(item.supplierCosts || {}).filter(([_, v]) => v > 0);
-        let cheapestSupplierId: string | null = null;
-        if (validEntries.length > 0) {
-          const cheapest = validEntries.reduce((min, current) => current[1] < min[1] ? current : min);
-          cheapestSupplierId = cheapest[0];
+      const validEntries = Object.entries(item.supplierCosts || {}).filter(([_, v]) => v > 0);
+      let cheapestSupplierId: string | null = null;
+      if (validEntries.length > 0) {
+        const cheapest = validEntries.reduce((min, current) => current[1] < min[1] ? current : min);
+        cheapestSupplierId = cheapest[0];
+      }
+
+      let supplierType: 'Fornecedor Original' | 'Mercado Local' = 'Fornecedor Original'; // Fallback
+      const hasStockCost = (item.costPrice ?? 0) > 0;
+
+      if (!hasStockCost && cheapestSupplierId) {
+        const sup = suppliers.find(s => String(s.id) === cheapestSupplierId);
+        if (sup && (sup.type === 'Fornecedor Original' || sup.type === 'Mercado Local')) {
+          supplierType = sup.type;
         }
+      }
 
-        let supplierType: 'Fornecedor Original' | 'Mercado Local' = 'Fornecedor Original'; // Fallback
-        const hasStockCost = (item.costPrice ?? 0) > 0;
+      const defaultMk = getDefaultMarkup(supplierType);
+      const numVal = isReset ? defaultMk : parsed;
 
-        if (!hasStockCost && cheapestSupplierId) {
-          const sup = suppliers.find(s => String(s.id) === cheapestSupplierId);
-          if (sup && (sup.type === 'Fornecedor Original' || sup.type === 'Mercado Local')) {
-            supplierType = sup.type;
-          }
-        }
+      // ANY deviation from the default requires manager approval — above OR below.
+      // ADMIN BYPASS: if user is admin, they can set any markup without approval
+      const isAdmin = userRole === 'admin';
+      const needsApproval = isAdmin ? false : (numVal !== defaultMk);
+      const approvalStatus: 'pending' | 'approved' | 'rejected' = needsApproval ? 'pending' : 'approved';
+      
+      let baseCost = item.unitPrice ?? 0;
+      if (hasStockCost) {
+        baseCost = item.costPrice!;
+      }
 
-        const defaultMk = getDefaultMarkup(supplierType);
-        const numVal = isReset ? defaultMk : (parseFloat(value) || 0);
-        const needsApproval = numVal < defaultMk;
-        
-        let baseCost = item.unitPrice ?? 0;
-        if (hasStockCost) {
-          baseCost = item.costPrice!;
-        }
+      const salePrice = baseCost * (1 + numVal / 100);
+      const isMarkupDirty = true;
 
-        const salePrice = baseCost * (1 + numVal / 100);
+      const updatedItem = { ...item, markupPercent: numVal, salePrice, unitPrice: baseCost, needsApproval, approvalStatus, isMarkupDirty };
 
-        let approvalStatus = item.approvalStatus;
-        if (numVal !== item.markupPercent) {
-          approvalStatus = needsApproval ? 'pending' : 'approved';
-        }
-
-        // The user manually triggered this function by typing or clearing the input,
-        // so the field is dirty and the server should save whatever value we computed.
-        const isMarkupDirty = true;
-
-        return { ...item, markupPercent: numVal, salePrice, unitPrice: baseCost, needsApproval, approvalStatus, isMarkupDirty };
-      })
-    );
-  }, [suppliers]);
+      const newACotar = [...prev];
+      newACotar[itemIdx] = updatedItem;
+      return newACotar;
+    });
+  }, [suppliers, userRole]);
 
   const updateItemField = useCallback((field: keyof ItemFormState, value: string | boolean) => {
     setItemForm(prev => {
@@ -649,6 +743,133 @@ export function useProtocolState(initialEstoque: ProtocolItem[] = [], initialACo
     setItemForm(EMPTY_ITEM_FORM);
   }, []);
 
+  // --- MOTOR GLOBAL DE PRECIFICAÇÃO DINÂMICA ---
+  useEffect(() => {
+    let cotarChanged = false;
+    let estoqueChanged = false;
+
+    // 1. Agrupar itens da cotação por fornecedor
+    const supplierGroups: Record<string, ProtocolItem[]> = {};
+    aCotarItems.forEach(item => {
+      const supId = item.supplierId;
+      if (supId) {
+        if (!supplierGroups[supId]) supplierGroups[supId] = [];
+        supplierGroups[supId].push(item);
+      }
+    });
+
+    // 2. Recalcular A Cotar
+    const newACotar = aCotarItems.map(item => {
+      const supId = item.supplierId;
+      const baseCost = item.unitPrice ?? 0;
+      const mk = item.markupPercent ?? 70;
+      const precoVendaBase = baseCost * (1 + mk / 100);
+      const subtotalBaseLinha = precoVendaBase * Number(item.quantity);
+      const subtotalComImposto = subtotalBaseLinha * 1.045; // Imposto 4.5%
+      const taxAmount = subtotalComImposto - subtotalBaseLinha;
+
+      let totalFinalVenda = subtotalComImposto;
+      let rateioFrete = 0;
+
+      if (supId) {
+        const totalSubtotalBaseSupplier = supplierGroups[supId].reduce((acc, i) => {
+          const iMk = i.markupPercent ?? 70;
+          const iBaseCost = i.unitPrice ?? 0;
+          return acc + (iBaseCost * (1 + iMk / 100)) * Number(i.quantity);
+        }, 0);
+
+        const peso = totalSubtotalBaseSupplier > 0 ? (subtotalBaseLinha / totalSubtotalBaseSupplier) : 0;
+        const supplierRow = suppliers.find(s => String(s.id) === supId);
+        const freightCost = supplierRow?.freight_cost || 0;
+        rateioFrete = freightCost * peso;
+        totalFinalVenda += rateioFrete;
+      }
+
+      const sp = totalFinalVenda / Number(item.quantity);
+
+      if (
+        Math.abs((item.salePrice ?? 0) - sp) > 0.001 ||
+        Math.abs((item.baseSubtotal ?? 0) - subtotalBaseLinha) > 0.001 ||
+        Math.abs((item.taxAmount ?? 0) - taxAmount) > 0.001 ||
+        Math.abs((item.freightAmount ?? 0) - rateioFrete) > 0.001 ||
+        Math.abs((item.finalTotal ?? 0) - totalFinalVenda) > 0.001
+      ) {
+        cotarChanged = true;
+        return { 
+          ...item, 
+          salePrice: sp,
+          baseSubtotal: subtotalBaseLinha,
+          taxAmount,
+          freightAmount: rateioFrete,
+          finalTotal: totalFinalVenda
+        };
+      }
+      return item;
+    });
+
+    // 3. Recalcular Estoque
+    const newEstoque = estoqueItems.map(est => {
+      // Procurar se ele está amarrado a um item Misto na cotação para espelhar o preço final
+      const linkedACotar = newACotar.find(ac => (ac.costPrice ?? 0) > 0 && (
+         (ac.productId && ac.productId === est.productId) || areItemsMatching(est, ac)
+      ));
+      
+      if (linkedACotar) {
+        if (Math.abs((est.salePrice ?? 0) - (linkedACotar.salePrice ?? 0)) > 0.001) {
+          estoqueChanged = true;
+          return { 
+            ...est, 
+            salePrice: linkedACotar.salePrice,
+            markupPercent: linkedACotar.markupPercent,
+            needsApproval: linkedACotar.needsApproval,
+            approvalStatus: linkedACotar.approvalStatus,
+            isMarkupDirty: linkedACotar.isMarkupDirty,
+            baseSubtotal: linkedACotar.baseSubtotal,
+            taxAmount: linkedACotar.taxAmount,
+            freightAmount: linkedACotar.freightAmount,
+            finalTotal: linkedACotar.finalTotal
+          };
+        }
+      } else {
+        // Item puro de estoque: recebe 4.5% de imposto mas não tem frete.
+        const baseCost = est.unitPrice ?? 0;
+        const mk = est.markupPercent ?? 70;
+        const precoVendaBase = baseCost * (1 + mk / 100);
+        const subtotalBaseLinha = precoVendaBase * Number(est.quantity);
+        const subtotalComImposto = subtotalBaseLinha * 1.045; // Imposto 4.5%
+        const taxAmount = subtotalComImposto - subtotalBaseLinha;
+        const sp = subtotalComImposto / Number(est.quantity);
+        
+        if (
+          Math.abs((est.salePrice ?? 0) - sp) > 0.001 ||
+          Math.abs((est.baseSubtotal ?? 0) - subtotalBaseLinha) > 0.001 ||
+          Math.abs((est.taxAmount ?? 0) - taxAmount) > 0.001 ||
+          Math.abs((est.freightAmount ?? 0) - 0) > 0.001 ||
+          Math.abs((est.finalTotal ?? 0) - subtotalComImposto) > 0.001
+        ) {
+          estoqueChanged = true;
+          return { 
+            ...est, 
+            salePrice: sp,
+            baseSubtotal: subtotalBaseLinha,
+            taxAmount,
+            freightAmount: 0,
+            finalTotal: subtotalComImposto
+          };
+        }
+      }
+      return est;
+    });
+
+    if (cotarChanged) {
+      setACotarItems(newACotar);
+    }
+    if (estoqueChanged) {
+      setEstoqueItems(newEstoque);
+    }
+
+  }, [aCotarItems, estoqueItems, suppliers]); // Dependências completas
+
   return {
     estoqueItems,
     setEstoqueItems,
@@ -669,6 +890,7 @@ export function useProtocolState(initialEstoque: ProtocolItem[] = [], initialACo
     removeACotarItem,
     updateACotarItemQuantity,
     updateSupplierCost,
+    forceItemSupplier,
     updateItemMarkup,
     updateItemField,
     updateMeasurement,

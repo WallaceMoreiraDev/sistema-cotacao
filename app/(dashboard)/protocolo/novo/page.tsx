@@ -1,4 +1,4 @@
-﻿'use client';
+'use client';
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
@@ -7,6 +7,7 @@ import { countUniqueProtocolItems } from '../../../lib/utils/protocolFormatters'
 
 import { useProtocolRealtime } from '../../../lib/hooks/useProtocolRealtime';
 import { useProtocolPage } from '../../../lib/hooks/useProtocolPage';
+import { useAuth } from '../../../context/AuthContext';
 
 import { HeaderProtocolo } from '../components/HeaderProtocolo';
 import { FormularioAdicaoItem } from '../components/FormularioAdicaoItem';
@@ -19,6 +20,7 @@ import { ModalCancelar } from '../components/ModalCancelar';
 import { FooterAcoes } from '../components/FooterAcoes';
 
 export default function NewProtocolPage() {
+  const { user } = useAuth();
   const { stockProducts, stockLoading, registeredClients, clientsLoading } = useProtocolRealtime();
 
   const [suppliers, setSuppliers] = useState<any[]>([]);
@@ -57,6 +59,7 @@ export default function NewProtocolPage() {
     registeredClients,
     stockProducts,
     suppliers,
+    userRole: user?.role,
   });
 
   const totals = calculateTotals(allItems);
@@ -98,6 +101,8 @@ export default function NewProtocolPage() {
         estoqueItemsCount={estoqueItems.length}
         updateQuantity={updateACotarItemQuantity} updateSupplierCost={updateSupplierCost}
         removeItem={removeACotarItem} updateItemMarkup={updateItemMarkup}
+        forceItemSupplier={forceItemSupplier}
+        userRole={user?.role}
         handleReallocate={(id, qty) => handleReallocate(id, qty, stockProducts)}
         getFreeStock={identifier => getFreeStock(identifier, stockProducts)}
       />
