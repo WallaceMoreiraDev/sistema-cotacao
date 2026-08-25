@@ -29,6 +29,7 @@ function mapRowToProtocolItem(row: any): ProtocolItem {
     approvalStatus: row.approval_status || 'pending',
     supplierCosts: row.supplier_costs || {},
     productId: row.product_id || undefined,
+    excludeFromPurchasing: row.measurements?.excludeFromPurchasing === true,
   };
 }
 
@@ -323,7 +324,10 @@ export async function saveProtocolAction(protocol: Protocol, options?: { skipDif
           nickname: item.nickname || null,
           code: item.code || null,
           brand: item.brand || null,
-          measurements: item.measurements || {},
+          measurements: {
+            ...(item.measurements || {}),
+            excludeFromPurchasing: item.excludeFromPurchasing,
+          },
           supplier_id: item.supplierId,
           markup_percent: finalMarkup,
           sale_price: finalSalePrice,

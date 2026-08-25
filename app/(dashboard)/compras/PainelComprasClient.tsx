@@ -38,7 +38,7 @@ export default function PainelComprasClient({ initialProtocols, suppliers, userR
       
       // Filter items to buy
       const pendingItems = items.filter(
-        i => i.type === 'a_cotar' && i.status !== 'comprado'
+        i => i.type === 'a_cotar' && i.status !== 'comprado' && !i.excludeFromPurchasing
       );
 
       if (pendingItems.length === 0) return;

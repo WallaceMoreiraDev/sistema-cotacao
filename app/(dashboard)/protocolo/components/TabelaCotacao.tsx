@@ -16,6 +16,7 @@ interface TabelaCotacaoProps {
   handleReallocate: (id: string, maxQty: number) => void;
   getFreeStock: (identifier: string) => number;
   forceItemSupplier?: (itemId: string, supplierId: string | null) => void;
+  toggleExcludeFromPurchasing?: (itemId: string) => void;
   userRole?: string;
   isViewing?: boolean;
 }
@@ -31,6 +32,7 @@ export function TabelaCotacao({
   handleReallocate,
   getFreeStock,
   forceItemSupplier,
+  toggleExcludeFromPurchasing,
   userRole,
   isViewing = false,
 }: TabelaCotacaoProps) {
@@ -253,6 +255,20 @@ export function TabelaCotacao({
                           Aproveitar {freeStock} un. Estoque
                         </button>
                       )}
+                    </div>
+                    
+                    {/* Right: Ações Rápidas */}
+                    <div className="flex items-center gap-3">
+                      <label className="flex items-center gap-2 cursor-pointer bg-slate-100 hover:bg-slate-200 transition-colors px-2 py-1 rounded border border-slate-200">
+                        <input
+                          type="checkbox"
+                          checked={!!item.excludeFromPurchasing}
+                          onChange={() => toggleExcludeFromPurchasing && toggleExcludeFromPurchasing(item.id)}
+                          disabled={isViewing || isPurchased}
+                          className="rounded border-slate-300 text-brand focus:ring-brand"
+                        />
+                        <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">Excluir da Lista Geral</span>
+                      </label>
                     </div>
                   </div>
 

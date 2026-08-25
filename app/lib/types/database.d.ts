@@ -71,6 +71,7 @@ export interface ProtocolItem {
   needsApproval?: boolean; // true when markup differs from default
   approvalStatus?: 'pending' | 'approved' | 'rejected'; // State of the requested markup
   isMarkupDirty?: boolean; // true if the user locally edited the markup but hasn't saved/synced yet
+  excludeFromPurchasing?: boolean; // true if excluded manually from the purchasing panel
   // ── Stock reference ──
   stockQty?: number; // qty found in stock at time of addition
   costPrice?: number; // from stock
