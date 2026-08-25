@@ -9,13 +9,14 @@ import { calculateTotals } from '../../lib/services/protocolService';
 import { distributeItemsToKanban } from '../../lib/services/kanbanService';
 import type { Protocol } from '../../lib/types/database';
 import { CustomDateRangePicker } from '../../components/CustomDateRangePicker';
-
+import PainelComprasClient from '../compras/PainelComprasClient';
 
 export default function DashboardPage() {
   const { user } = useAuth();
   const [protocols, setProtocols] = useState<Protocol[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState<'geral' | 'kanban'>('geral');
+  const [activeTab, setActiveTab] = useState<'geral' | 'kanban' | 'compras'>('geral');
+  const [suppliers, setSuppliers] = useState<{id: string|number; name: string}[]>([]);
   const [filterClient, setFilterClient] = useState('');
   const [filterProtocol, setFilterProtocol] = useState('');
   const [filterDateMode, setFilterDateMode] = useState<'all' | 'today' | 'yesterday' | 'custom'>('all');
@@ -164,10 +165,23 @@ export default function DashboardPage() {
   useEffect(() => {
     async function loadFromSupabase() {
       setIsLoading(true);
-      const res = await getProtocolsAction();
-      if (res.success && res.data && res.data.length > 0) {
-        setProtocols(res.data);
+      
+      const { createClient } = await import('../../lib/supabase/client');
+      const supabase = createClient();
+      
+      const [protoRes, supRes] = await Promise.all([
+        getProtocolsAction(),
+        supabase.from('suppliers').select('id, name').order('name')
+      ]);
+
+      if (protoRes.success && protoRes.data && protoRes.data.length > 0) {
+        setProtocols(protoRes.data);
       }
+      
+      if (supRes.data) {
+        setSuppliers(supRes.data);
+      }
+      
       setIsLoading(false);
     }
     loadFromSupabase();
@@ -206,16 +220,6 @@ export default function DashboardPage() {
                 Área Administrativa
               </Link>
             )}
-
-            <Link
-              href="/compras"
-              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-indigo-50 px-5 py-3 text-sm font-bold text-indigo-700 shadow-sm border border-indigo-100 transition-all hover:bg-indigo-100 focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2 focus:ring-offset-slate-900"
-            >
-              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
-              </svg>
-              Lista de Compras
-            </Link>
 
             <Link
               href="/protocolo/novo"
@@ -263,6 +267,21 @@ export default function DashboardPage() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17V7m0 10a2 2 0 01-2 2H5a2 2 0 01-2-2V7a2 2 0 012-2h2a2 2 0 012 2m0 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2m0 10V7m6 10a2 2 0 002 2h2a2 2 0 002-2V7a2 2 0 00-2-2h-2a2 2 0 00-2 2" />
               </svg>
               Kanban
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setActiveTab('compras')}
+              className={`flex items-center gap-2 rounded-lg px-4 py-2 text-xs font-bold transition-all ${
+                activeTab === 'compras'
+                  ? 'bg-slate-900 text-white shadow-sm'
+                  : 'text-slate-600 hover:text-slate-900'
+              }`}
+            >
+              <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+              </svg>
+              Panorama de Compras
             </button>
           </div>
           
@@ -360,6 +379,12 @@ export default function DashboardPage() {
           </div>
         </div>
       </div>
+
+      {activeTab === 'compras' && (
+        <div className="mt-8">
+          <PainelComprasClient initialProtocols={protocols} suppliers={suppliers} userRole={user?.role} />
+        </div>
+      )}
 
       {/* Tab Content 1: ABA GERAL */}
       {activeTab === 'geral' && (

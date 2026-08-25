@@ -37,7 +37,7 @@ export default function PainelComprasClient({ initialProtocols, suppliers, userR
       
       // Filter items to buy
       const pendingItems = items.filter(
-        i => i.type === 'a_cotar' && i.isPurchased !== true && i.supplierId
+        i => i.type === 'a_cotar' && i.isPurchased !== true
       );
 
       if (pendingItems.length === 0) return;
@@ -45,9 +45,24 @@ export default function PainelComprasClient({ initialProtocols, suppliers, userR
       // Group by supplier
       const supplierMap: Record<string, ProtocolItem[]> = {};
       pendingItems.forEach(i => {
-        const sId = String(i.supplierId);
-        if (!supplierMap[sId]) supplierMap[sId] = [];
-        supplierMap[sId].push(i);
+        let sId = String(i.forcedSupplierId || i.supplierId || '');
+        
+        // If still no supplierId but we have costs, determine the cheapest
+        if (!sId || sId === 'undefined') {
+          if (i.supplierCosts) {
+            const validEntries = Object.entries(i.supplierCosts).filter(([_, v]) => v > 0);
+            if (validEntries.length > 0) {
+              const cheapest = validEntries.reduce((min, current) => current[1] < min[1] ? current : min);
+              sId = cheapest[0];
+            }
+          }
+        }
+
+        // Only group if we have a resolved supplier ID
+        if (sId && sId !== 'undefined' && sId !== 'null') {
+          if (!supplierMap[sId]) supplierMap[sId] = [];
+          supplierMap[sId].push(i);
+        }
       });
 
       // Add to global groups
