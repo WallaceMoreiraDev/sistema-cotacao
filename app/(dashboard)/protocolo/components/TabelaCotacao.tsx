@@ -3,6 +3,7 @@ import type { ProtocolItem } from '../../../lib/types/database';
 import type { SupplierRow } from '../../../lib/actions/suppliers';
 import { formatCurrency, formatMeasurement } from '../../../lib/utils/protocolFormatters';
 import { getDefaultMarkup } from '../../../lib/config/suppliers';
+import { exportProtocolToExcel } from '../../../lib/utils/exportExcel';
 
 interface TabelaCotacaoProps {
   items: ProtocolItem[];
@@ -15,6 +16,7 @@ interface TabelaCotacaoProps {
   handleReallocate: (id: string, maxQty: number) => void;
   getFreeStock: (identifier: string) => number;
   forceItemSupplier?: (itemId: string, supplierId: string | null) => void;
+  toggleItemPurchased?: (itemId: string) => void;
   userRole?: string;
   isViewing?: boolean;
 }
@@ -30,11 +32,19 @@ export function TabelaCotacao({
   handleReallocate,
   getFreeStock,
   forceItemSupplier,
+  toggleItemPurchased,
   userRole,
   isViewing = false,
 }: TabelaCotacaoProps) {
   const isAdmin = userRole === 'admin';
   const [unlockedItems, setUnlockedItems] = useState<Set<string>>(new Set());
+  const [isExporting, setIsExporting] = useState(false);
+
+  const handleExport = async () => {
+    setIsExporting(true);
+    await exportProtocolToExcel(items);
+    setIsExporting(false);
+  };
 
   const handleUnlock = (id: string) => {
     setUnlockedItems(prev => {
@@ -53,9 +63,30 @@ export function TabelaCotacao({
           <div className="h-2.5 w-2.5 rounded-full bg-amber-500" />
           <h2 className="text-xs font-bold text-slate-900 uppercase tracking-wider">Itens a Serem Cotados</h2>
         </div>
-        <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-[10px] font-bold text-amber-700">
-          {items.length} {items.length === 1 ? 'item' : 'itens'}
-        </span>
+        <div className="flex items-center gap-4">
+          <button
+            onClick={handleExport}
+            disabled={isExporting}
+            className="text-[10px] font-bold uppercase tracking-wider text-amber-700 bg-amber-100/50 hover:bg-amber-200/50 border border-amber-200 px-3 py-1.5 rounded flex items-center gap-1.5 transition-colors disabled:opacity-50"
+            title="Baixar Tabela para o Fornecedor"
+          >
+            {isExporting ? (
+              <svg className="w-3.5 h-3.5 animate-spin" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+            ) : (
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+            )}
+            Gerar Planilha
+          </button>
+          
+          <span className="rounded-full bg-amber-100 px-2.5 py-0.5 text-[10px] font-bold text-amber-700">
+            {items.length} {items.length === 1 ? 'item' : 'itens'}
+          </span>
+        </div>
       </div>
       
       <div className="p-4 space-y-4">
@@ -95,10 +126,10 @@ export function TabelaCotacao({
               <div key={item.id} className="flex flex-col rounded-xl border border-slate-200 bg-white overflow-hidden shadow-sm transition-shadow hover:shadow-md">
                 
                 {/* 1. CABEÇALHO DO ITEM */}
-                <div className="flex flex-col md:flex-row md:items-center justify-between p-4 bg-slate-50 border-b border-slate-200 gap-4">
+                <div className={`flex flex-col md:flex-row md:items-center justify-between p-4 border-b gap-4 transition-colors ${item.isPurchased ? 'bg-slate-100/50 opacity-80 border-slate-200' : 'bg-slate-50 border-slate-200'}`}>
                   
                   {/* Left: Identificação */}
-                  <div className="flex items-start gap-3">
+                  <div className={`flex items-start gap-3 ${item.isPurchased ? 'opacity-60' : ''}`}>
                     <span className="text-slate-400 font-bold text-sm">#{index + 1 + estoqueItemsCount}</span>
                     <div>
                       <div className="font-bold text-slate-800 text-sm leading-tight flex flex-wrap items-center gap-2">
@@ -175,7 +206,7 @@ export function TabelaCotacao({
                                   }
                                 }}
                                 title={item.forcedSupplierId === String(sup.id) ? 'Remover trava' : 'Forçar este fornecedor'}
-                                className={`text-[10px] p-0.5 rounded transition ${item.forcedSupplierId === String(sup.id) ? 'text-brand bg-brand/10 hover:bg-brand/20' : 'text-slate-400 hover:text-brand hover:bg-slate-100'}`}
+                                className={`text-[10px] p-0.5 rounded transition ${item.forcedSupplierId === String(sup.id) ? 'text-brand bg-brand/10 hover:bg-brand/20' : 'text-slate-400 hover:bg-slate-100'}`}
                               >
                                 <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20">
                                   <path fillRule="evenodd" d="M10 2a1 1 0 011 1v1.323l3.954 1.582 1.599-.8a1 1 0 01.894 1.79l-1.233.616 1.738 5.42a1 1 0 01-.285 1.05A3.989 3.989 0 0115 15a3.989 3.989 0 01-2.667-1.019 1 1 0 01-.285-1.05l1.715-5.349L11 6.477V16h2a1 1 0 110 2H7a1 1 0 110-2h2V6.477L6.237 7.582l1.715 5.349a1 1 0 01-.285 1.05A3.989 3.989 0 015 15a3.989 3.989 0 01-2.667-1.019 1 1 0 01-.285-1.05l1.738-5.42-1.233-.617a1 1 0 01.894-1.788l1.599.799L9 4.323V3a1 1 0 011-1z" clipRule="evenodd" />
@@ -200,47 +231,63 @@ export function TabelaCotacao({
                 <div className="bg-slate-50 border-t border-slate-200 p-3 flex flex-col md:flex-row items-center justify-between gap-4">
                   
                   {/* Left: Vencedor e Alertas */}
-                  <div className="flex items-center gap-3">
-                    {item.costPrice && item.costPrice > 0 ? (
-                      <span className="text-[10px] font-bold text-amber-700 bg-amber-100 px-2 py-1 rounded flex items-center gap-1 border border-amber-200 shadow-sm" title="O custo base desta linha está usando o custo do estoque porque existem unidades em estoque. Os custos dos fornecedores serão salvos apenas para histórico.">
-                        <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
-                        Venda travada pelo custo do estoque
-                      </span>
-                    ) : (
-                      <div className="text-[11px] text-slate-400 font-medium italic">Sem custo base travado</div>
-                    )}
+                  <div className="flex flex-col gap-2">
+                    <div className="flex items-center gap-3">
+                      {item.costPrice && item.costPrice > 0 ? (
+                        <span className="text-[10px] font-bold text-amber-700 bg-amber-100 px-2 py-1 rounded flex items-center gap-1 border border-amber-200 shadow-sm">
+                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+                          Venda travada pelo custo do estoque
+                        </span>
+                      ) : (
+                        <div className="text-[11px] text-slate-400 font-medium italic">Sem custo base travado</div>
+                      )}
+                      
+                      {canReallocate && (
+                        <button
+                          type="button"
+                          onClick={() => handleReallocate(item.id, freeStock)}
+                          className="text-[10px] font-bold text-amber-600 bg-amber-50 hover:bg-amber-100 px-2 py-1 rounded border border-amber-200 transition-colors"
+                        >
+                          Aproveitar {freeStock} un. Estoque
+                        </button>
+                      )}
+                    </div>
                     
-                    {canReallocate && (
-                      <button
-                        type="button"
-                        onClick={() => handleReallocate(item.id, freeStock)}
-                        className="text-[10px] font-bold text-amber-600 bg-amber-50 hover:bg-amber-100 px-2 py-1 rounded border border-amber-200 transition-colors"
-                      >
-                        Aproveitar {freeStock} un. Estoque
-                      </button>
-                    )}
+                    {/* Right: Ações Rápidas */}
+                    <div className="flex items-center gap-3">
+                      <label className="flex items-center gap-2 cursor-pointer bg-slate-100 hover:bg-slate-200 transition-colors px-2 py-1 rounded border border-slate-200">
+                        <input
+                          type="checkbox"
+                          checked={!!item.isPurchased}
+                          onChange={() => toggleItemPurchased && toggleItemPurchased(item.id)}
+                          disabled={isViewing}
+                          className="rounded border-slate-300 text-brand focus:ring-brand"
+                        />
+                        <span className="text-[10px] font-bold text-slate-600 uppercase tracking-wider">Excluir da Lista Geral</span>
+                      </label>
+                    </div>
                   </div>
 
                   {/* Right: Financeiro */}
                   <div className="flex flex-col md:flex-row items-end md:items-center gap-4 md:gap-6">
                     {isAdmin && item.finalTotal && item.finalTotal > 0 && (
                       <div className="flex items-center gap-3 bg-white px-3 py-1.5 rounded-lg border border-slate-200/60 shadow-sm text-[9px] text-slate-500 hidden xl:flex">
-                        <div className="flex flex-col" title="Custo Fornecedor = Custo Unitário × Qtde">
+                        <div className="flex flex-col">
                           <span className="font-bold text-slate-400 uppercase">Custo Forn. Total</span>
                           <span className="text-slate-700 font-medium">{formatCurrency((item.unitPrice || 0) * Number(item.quantity))}</span>
                         </div>
                         <div className="h-6 w-px bg-slate-200" />
-                        <div className="flex flex-col" title="Subtotal Base = Preço Base Venda × Qtde">
+                        <div className="flex flex-col">
                           <span className="font-bold text-slate-400 uppercase">Sub. Base (Venda)</span>
                           <span className="text-slate-700 font-medium">{formatCurrency(item.baseSubtotal || 0)}</span>
                         </div>
                         <div className="h-6 w-px bg-slate-200" />
-                        <div className="flex flex-col" title="Imposto de 4,5%">
+                        <div className="flex flex-col">
                           <span className="font-bold text-slate-400 uppercase">+ Imposto</span>
                           <span className="text-rose-600 font-medium">{formatCurrency(item.taxAmount || 0)}</span>
                         </div>
                         <div className="h-6 w-px bg-slate-200" />
-                        <div className="flex flex-col" title="Rateio de Frete Padrão">
+                        <div className="flex flex-col">
                           <span className="font-bold text-slate-400 uppercase">+ Frete</span>
                           <span className="text-amber-600 font-medium">{formatCurrency(item.freightAmount || 0)}</span>
                         </div>
@@ -257,7 +304,6 @@ export function TabelaCotacao({
                         <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider flex items-center gap-1">
                           Markup %
                         </label>
-                        {/* Only show approval badge when the item actually went through the approval flow */}
                         {item.needsApproval && (
                           <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded ${isApproved ? 'bg-emerald-100 text-emerald-700' : isRejected ? 'bg-red-100 text-red-700' : 'bg-amber-100 text-amber-700'}`}>
                             {isApproved ? '✅ Aprovado' : isRejected ? '❌ Rejeitado' : '⚠️ Requer Aprovação'}

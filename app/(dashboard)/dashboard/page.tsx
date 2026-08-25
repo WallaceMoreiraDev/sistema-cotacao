@@ -208,6 +208,16 @@ export default function DashboardPage() {
             )}
 
             <Link
+              href="/compras"
+              className="inline-flex items-center justify-center gap-2 rounded-2xl bg-indigo-50 px-5 py-3 text-sm font-bold text-indigo-700 shadow-sm border border-indigo-100 transition-all hover:bg-indigo-100 focus:ring-2 focus:ring-indigo-400 focus:ring-offset-2 focus:ring-offset-slate-900"
+            >
+              <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+              </svg>
+              Lista de Compras
+            </Link>
+
+            <Link
               href="/protocolo/novo"
               className="inline-flex items-center justify-center gap-2 rounded-2xl bg-[#F7C00C] px-5 py-3 text-sm font-bold text-slate-950 shadow-lg shadow-amber-500/10 transition-all hover:bg-[#E8B600] focus:ring-2 focus:ring-[#F7C00C] focus:ring-offset-2 focus:ring-offset-slate-900"
             >

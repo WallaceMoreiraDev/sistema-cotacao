@@ -47,7 +47,7 @@ export default function ProtocolDetailPage() {
     handleAddItem, handleAddStockItem, handleReallocate,
     removeEstoqueItem, updateEstoqueItemQuantity,
     removeACotarItem, updateACotarItemQuantity, updateSupplierCost,
-    updateItemMarkup, updateItemField, updateMeasurement, clearItemForm,
+    forceItemSupplier, toggleItemPurchased, updateItemMarkup, updateItemField, updateMeasurement, clearItemForm,
     handleCreateNewItem, allItems,
     isFormUnlocked, isItemFormValid, canFinalize, canSendToBling,
     handleCancelar, confirmCancelar, handleRestaurar, handleEstornar,
@@ -59,7 +59,6 @@ export default function ProtocolDetailPage() {
     reallocatableItems, insufficientStockItems,
     handleExceedStock, handleConfirmSplit,
     handleConfirmDeficit, handleConfirmRealloc, handleConfirmIgnore,
-    forceItemSupplier,
   } = useProtocolPage({
     protocolId: params?.id,
     initialViewing: true,
@@ -149,7 +148,9 @@ export default function ProtocolDetailPage() {
       <TabelaCotacao items={aCotarItems} suppliers={suppliers} estoqueItemsCount={estoqueItems.length}
         updateQuantity={updateACotarItemQuantity} updateSupplierCost={updateSupplierCost}
         removeItem={removeACotarItem} updateItemMarkup={updateItemMarkup}
-        forceItemSupplier={forceItemSupplier} userRole={user?.role}
+        forceItemSupplier={forceItemSupplier}
+        toggleItemPurchased={toggleItemPurchased}
+        userRole={user?.role}
         handleReallocate={(id, qty) => handleReallocate(id, qty, stockProducts)}
         getFreeStock={identifier => getFreeStock(identifier, stockProducts)} isViewing={isViewing} />
       <FooterAcoes totals={totals} canFinalize={canFinalize} allItemsCount={countUniqueProtocolItems(allItems)}
