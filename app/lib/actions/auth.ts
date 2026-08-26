@@ -2,6 +2,43 @@
 
 import { createClient } from '../supabase/server';
 import { redirect } from 'next/navigation';
+import { headers } from 'next/headers';
+
+export async function logAuthEvent(action: string, overrideUserId?: string) {
+  try {
+    const supabase = await createClient();
+    
+    let userId = overrideUserId;
+    if (!userId) {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return { success: false, message: 'Nenhum usuário logado.' };
+      userId = user.id;
+    }
+
+    const headersList = await headers();
+    const ipAddress = headersList.get('x-forwarded-for') || headersList.get('x-real-ip') || 'Desconhecido';
+    const userAgent = headersList.get('user-agent') || 'Desconhecido';
+
+    const { error } = await supabase.from('auth_logs').insert([
+      {
+        user_id: userId,
+        action,
+        ip_address: ipAddress,
+        user_agent: userAgent
+      }
+    ]);
+
+    if (error) {
+      console.error('Erro ao registrar log de auth:', error);
+      return { success: false, message: 'Erro ao registrar log.' };
+    }
+
+    return { success: true, message: 'Log registrado com sucesso.' };
+  } catch (error) {
+    console.error('Falha inesperada no log de auth:', error);
+    return { success: false, message: 'Falha inesperada no log.' };
+  }
+}
 
 export async function login(formData: FormData) {
   const email = formData.get('email') as string;
@@ -13,7 +50,7 @@ export async function login(formData: FormData) {
 
   const supabase = await createClient();
 
-  const { error } = await supabase.auth.signInWithPassword({
+  const { data, error } = await supabase.auth.signInWithPassword({
     email,
     password,
   });
@@ -22,6 +59,11 @@ export async function login(formData: FormData) {
     console.error("Login error details:", error);
     // Return the actual error message for debugging purposes
     return { error: `Erro no login: ${error.message} (Code: ${error.status})` };
+  }
+
+  // Record login event
+  if (data?.user) {
+    await logAuthEvent('LOGIN', data.user.id);
   }
 
   redirect('/dashboard');

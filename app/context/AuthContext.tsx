@@ -1,8 +1,9 @@
 'use client';
 
 import { createContext, useContext, useMemo, useState, useEffect } from 'react';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
 import { createClient } from '../lib/supabase/client';
+import { logAuthEvent } from '../lib/actions/auth';
 
 export type UserRole = 'admin' | 'funcionario';
 
@@ -29,6 +30,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const pathname = usePathname();
+  const router = useRouter();
   const supabase = createClient();
 
   // Helper to fetch profile and update state
@@ -114,8 +116,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const login = (nextUser: User) => setUser(nextUser);
   const logout = async () => {
+    try {
+      await logAuthEvent('LOGOUT');
+    } catch (e) {
+      console.error('Error logging out event', e);
+    }
     await supabase.auth.signOut();
     setUser(null);
+    router.replace('/login');
   };
 
   const value = useMemo(() => ({ user, isLoading, login, logout }), [user, isLoading]);

@@ -60,10 +60,13 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       .toUpperCase();
   };
 
+  const isProtocoloPage = pathname?.startsWith('/protocolo');
+
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
       {/* Global Top Bar */}
-      <header className="bg-black border-b border-neutral-900 sticky top-0 z-50 shadow-sm">
+      {!isProtocoloPage && (
+        <header className="bg-black border-b border-neutral-900 sticky top-0 z-50 shadow-sm">
         <div className="mx-auto max-w-7xl px-4 h-20 flex items-center justify-between lg:px-8">
           
           {/* Logo */}
@@ -118,6 +121,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
           </div>
         </div>
       </header>
+      )}
 
       {/* Main Content Area */}
       <main className="flex-1 mx-auto max-w-7xl px-4 py-6 lg:px-8 w-full">

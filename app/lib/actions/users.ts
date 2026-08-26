@@ -2,6 +2,7 @@
 
 import { createClient } from '@supabase/supabase-js';
 import type { Profile } from '../types/database';
+import { logAuthEvent } from './auth';
 
 // Helper for Service Role client (bypasses RLS, used only in server actions)
 function getAdminSupabase() {
@@ -153,6 +154,8 @@ export async function adminResetUserPasswordAction(userId: string, tempPassword:
 
     if (profileError) throw profileError;
 
+    await logAuthEvent('PASSWORD_RESET', userId);
+
     return { success: true };
   } catch (err: any) {
     console.error('Error in adminResetUserPasswordAction:', err);
@@ -173,6 +176,9 @@ export async function markUserPasswordChangedAction(userId: string) {
       .eq('id', userId);
 
     if (error) throw error;
+    
+    await logAuthEvent('PASSWORD_CHANGE', userId);
+    
     return { success: true };
   } catch (err: any) {
     console.error('Error in markUserPasswordChangedAction:', err);
