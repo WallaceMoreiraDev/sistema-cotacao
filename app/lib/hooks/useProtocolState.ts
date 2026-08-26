@@ -92,6 +92,8 @@ export function useProtocolState(initialEstoque: ProtocolItem[] = [], initialACo
           name: itemForm.category || 'N/A',
           quantity: remainQty,
           unitPrice: 0,
+          costPrice: match.costPrice,
+          productId: match.id,
           type: 'a_cotar',
           status: 'pendente',
           oem_code: itemForm.oemCode || undefined,
@@ -124,6 +126,8 @@ export function useProtocolState(initialEstoque: ProtocolItem[] = [], initialACo
         name: itemForm.category || 'N/A',
         quantity: qty,
         unitPrice: 0,
+        costPrice: (!itemForm.ignoreStock && match) ? match.costPrice : undefined,
+        productId: (!itemForm.ignoreStock && match) ? match.id : undefined,
         type: 'a_cotar',
         status: 'pendente',
         oem_code: itemForm.oemCode || undefined,
@@ -765,6 +769,19 @@ export function useProtocolState(initialEstoque: ProtocolItem[] = [], initialACo
 
     // 2. Recalcular A Cotar
     const newACotar = aCotarItems.map(item => {
+      // Auto-trava: se este item não tem costPrice, mas existe um igual no Estoque, assume a trava!
+      let currentCostPrice = item.costPrice;
+      let currentProductId = item.productId;
+      let changedByLock = false;
+      if (!currentCostPrice || currentCostPrice <= 0) {
+        const matchingEstoque = estoqueItems.find(est => areItemsMatching(est, item) && (est.costPrice ?? 0) > 0);
+        if (matchingEstoque) {
+          currentCostPrice = matchingEstoque.costPrice;
+          currentProductId = matchingEstoque.productId;
+          changedByLock = true;
+        }
+      }
+
       const supId = item.supplierId;
       const baseCost = item.unitPrice ?? 0;
       const mk = item.markupPercent ?? 70;
@@ -787,12 +804,18 @@ export function useProtocolState(initialEstoque: ProtocolItem[] = [], initialACo
         const supplierRow = suppliers.find(s => String(s.id) === supId);
         const freightCost = supplierRow?.freight_cost || 0;
         rateioFrete = freightCost * peso;
-        totalFinalVenda += rateioFrete;
+        
+        // Item misto (travado pelo estoque) não repassa o frete pro cliente no preço final
+        const isLockedByStock = (currentCostPrice ?? 0) > 0;
+        if (!isLockedByStock) {
+          totalFinalVenda += rateioFrete;
+        }
       }
 
       const sp = totalFinalVenda / Number(item.quantity);
 
       if (
+        changedByLock ||
         Math.abs((item.salePrice ?? 0) - sp) > 0.001 ||
         Math.abs((item.baseSubtotal ?? 0) - subtotalBaseLinha) > 0.001 ||
         Math.abs((item.taxAmount ?? 0) - taxAmount) > 0.001 ||
@@ -802,6 +825,8 @@ export function useProtocolState(initialEstoque: ProtocolItem[] = [], initialACo
         cotarChanged = true;
         return { 
           ...item, 
+          costPrice: currentCostPrice,
+          productId: currentProductId,
           salePrice: sp,
           baseSubtotal: subtotalBaseLinha,
           taxAmount,
@@ -820,19 +845,38 @@ export function useProtocolState(initialEstoque: ProtocolItem[] = [], initialACo
       ));
       
       if (linkedACotar) {
-        if (Math.abs((est.salePrice ?? 0) - (linkedACotar.salePrice ?? 0)) > 0.001) {
+        // Misto: espelha o PREÇO DE VENDA UNITÁRIO do item cotado, para não haver inconsistência na tela.
+        const sp = linkedACotar.salePrice ?? 0;
+        const subtotalComImposto = sp * Number(est.quantity);
+        const subtotalBaseLinha = subtotalComImposto / 1.045; // Remove 4.5% para achar a base real (o frete foi absorvido como lucro na base)
+        const taxAmount = subtotalComImposto - subtotalBaseLinha;
+        
+        // Mantemos o custo e markup visualmente iguais
+        const baseCost = linkedACotar.unitPrice ?? 0;
+        const mk = linkedACotar.markupPercent ?? 70;
+
+        if (
+          Math.abs((est.salePrice ?? 0) - sp) > 0.001 ||
+          Math.abs((est.baseSubtotal ?? 0) - subtotalBaseLinha) > 0.001 ||
+          Math.abs((est.taxAmount ?? 0) - taxAmount) > 0.001 ||
+          Math.abs((est.freightAmount ?? 0) - 0) > 0.001 ||
+          Math.abs((est.finalTotal ?? 0) - subtotalComImposto) > 0.001 ||
+          est.unitPrice !== baseCost ||
+          est.markupPercent !== mk
+        ) {
           estoqueChanged = true;
           return { 
             ...est, 
-            salePrice: linkedACotar.salePrice,
-            markupPercent: linkedACotar.markupPercent,
+            unitPrice: baseCost,
+            salePrice: sp,
+            markupPercent: mk,
             needsApproval: linkedACotar.needsApproval,
             approvalStatus: linkedACotar.approvalStatus,
             isMarkupDirty: linkedACotar.isMarkupDirty,
-            baseSubtotal: linkedACotar.baseSubtotal,
-            taxAmount: linkedACotar.taxAmount,
-            freightAmount: linkedACotar.freightAmount,
-            finalTotal: linkedACotar.finalTotal
+            baseSubtotal: subtotalBaseLinha,
+            taxAmount,
+            freightAmount: 0,
+            finalTotal: subtotalComImposto
           };
         }
       } else {
