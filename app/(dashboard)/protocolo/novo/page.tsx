@@ -53,6 +53,7 @@ export default function NewProtocolPage() {
     reallocatableItems, insufficientStockItems,
     handleExceedStock, handleConfirmSplit,
     handleConfirmDeficit, handleConfirmRealloc, handleConfirmIgnore,
+    protocolIdRef,
   } = useProtocolPage({
     initialViewing: false,
     navigateAfterSave: true,
