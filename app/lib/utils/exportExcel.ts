@@ -33,10 +33,26 @@ export async function exportProtocolToExcel(items: ProtocolItem[], protocolTitle
       const rowIndex = startRow + index;
       const row = worksheet!.getRow(rowIndex);
 
-      // Extrair medidas no formato A x B x C
-      const measurements = Object.values(item.measurements || {})
-        .filter(Boolean)
-        .join('X');
+      // Extrair medidas na ordem correta: DI x DE x Altura(s) x CS/Espessura
+      const m = item.measurements || {};
+      const parts: string[] = [];
+      
+      if (m.innerDiameter) parts.push(m.innerDiameter.toString());
+      if (m.outerDiameter) parts.push(m.outerDiameter.toString());
+      
+      if (m.height1 && m.height2) {
+        parts.push(`${m.height1}/${m.height2}`);
+      } else if (m.height1) {
+        parts.push(m.height1.toString());
+      } else if (m.height2) {
+        parts.push(m.height2.toString());
+      }
+      
+      // Evitar duplicar a espessura/CS se ela for exatamente igual à altura1 (muito comum no parser automático)
+      if (m.thickness && m.thickness !== m.height1) parts.push(m.thickness.toString());
+      if (m.cs && m.cs !== m.height1 && m.cs !== m.thickness) parts.push(m.cs.toString());
+
+      const measurements = parts.join('X').toUpperCase();
 
       // Coluna A: Item (Número)
       row.getCell(1).value = index + 1;
