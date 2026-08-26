@@ -56,9 +56,9 @@ export async function login(formData: FormData) {
   });
 
   if (error) {
-    console.error("Login error details:", error);
-    // Return the actual error message for debugging purposes
-    return { error: `Erro no login: ${error.message} (Code: ${error.status})` };
+    console.error("Login error details:", error.message, error.status);
+    // SECURITY FIX: Never expose exact reasons to prevent enumeration attacks
+    return { error: 'E-mail ou senha incorretos.' };
   }
 
   // Record login event and check status
