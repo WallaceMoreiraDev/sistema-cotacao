@@ -41,9 +41,16 @@ export function extractMeasurementsFromName(name: string): ParsedMeasurements | 
 
   const alt1 = parseFloat(match[3]);
   if (!isNaN(alt1)) {
-    result.height1 = alt1;
-    // Em muitos casos se tem apenas 3, consideramos o terceiro como espessura/altura principal
-    result.thickness = alt1;
+    // Determinar a categoria para saber se o terceiro valor é Altura ou Espessura (CS)
+    const category = extractCategoryFromName(name);
+    const isORing = category === 'Anel O-Ring' || category === 'Anel Anti-Extrusão';
+
+    if (isORing) {
+      result.cs = alt1;
+      result.thickness = alt1;
+    } else {
+      result.height1 = alt1;
+    }
   }
 
   const alt2 = parseFloat(match[4]);
