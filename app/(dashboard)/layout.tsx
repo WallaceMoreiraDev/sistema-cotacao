@@ -2,6 +2,7 @@
 
 import { useEffect, useState, useRef } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
+import Image from 'next/image';
 import { useAuth } from '../context/AuthContext';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
@@ -62,25 +63,32 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
   return (
     <div className="min-h-screen bg-slate-50 flex flex-col">
       {/* Global Top Bar */}
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-50 shadow-sm">
-        <div className="mx-auto max-w-7xl px-4 h-16 flex items-center justify-between lg:px-8">
+      <header className="bg-black border-b border-neutral-900 sticky top-0 z-50 shadow-sm">
+        <div className="mx-auto max-w-7xl px-4 h-20 flex items-center justify-between lg:px-8">
+          
+          {/* Logo */}
           <div className="flex items-center gap-3">
-            <div className="h-8 w-8 rounded bg-[#F7C00C] flex items-center justify-center font-bold text-slate-900 shadow-sm">
-              SV
-            </div>
-            <span className="font-bold text-slate-900 hidden sm:block tracking-tight">Sistema Vedações</span>
+            <Image 
+              src="/images/logo_fm.png" 
+              alt="Sistema Vedações" 
+              width={160} 
+              height={44} 
+              className="h-12 w-auto object-contain"
+              priority
+            />
           </div>
 
+          {/* User Profile */}
           <div className="relative" ref={menuRef}>
             <button
               onClick={() => setShowProfileMenu(!showProfileMenu)}
-              className="flex items-center gap-3 hover:bg-slate-50 p-1.5 rounded-lg transition-colors border border-transparent hover:border-slate-200"
+              className="flex items-center gap-3 hover:bg-neutral-900 p-1.5 rounded-xl transition-all border border-transparent hover:border-neutral-800"
             >
               <div className="flex flex-col items-end hidden sm:flex">
-                <span className="text-sm font-bold text-slate-700 leading-none">{user.name}</span>
-                <span className="text-[10px] text-slate-500 font-medium uppercase tracking-wider mt-1">{user.role}</span>
+                <span className="text-sm font-bold text-white leading-none">{user.name}</span>
+                <span className="text-[10px] text-neutral-400 font-bold uppercase tracking-wider mt-1">{user.role}</span>
               </div>
-              <div className="h-9 w-9 rounded-full bg-slate-100 flex items-center justify-center text-sm font-bold text-slate-600 border border-slate-200 shadow-sm">
+              <div className="h-9 w-9 rounded-full bg-neutral-800 flex items-center justify-center text-sm font-bold text-neutral-200 border border-neutral-700 shadow-sm">
                 {getInitials(user.name)}
               </div>
             </button>
