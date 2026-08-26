@@ -61,8 +61,20 @@ export async function login(formData: FormData) {
     return { error: `Erro no login: ${error.message} (Code: ${error.status})` };
   }
 
-  // Record login event
+  // Record login event and check status
   if (data?.user) {
+    // SECURITY CHECK: Verify if user profile is active
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('status')
+      .eq('id', data.user.id)
+      .single();
+
+    if (profile?.status === 'inativo') {
+      await supabase.auth.signOut();
+      return { error: 'Conta desativada. Entre em contato com o administrador.' };
+    }
+
     await logAuthEvent('LOGIN', data.user.id);
   }
 
