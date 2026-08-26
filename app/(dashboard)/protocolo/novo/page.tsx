@@ -106,6 +106,7 @@ export default function NewProtocolPage() {
         userRole={user?.role}
         handleReallocate={(id, qty) => handleReallocate(id, qty, stockProducts)}
         getFreeStock={identifier => getFreeStock(identifier, stockProducts)}
+        protocolId={protocolIdRef.current}
       />
 
       <FooterAcoes

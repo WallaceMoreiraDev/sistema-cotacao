@@ -152,7 +152,8 @@ export default function ProtocolDetailPage() {
         toggleExcludeFromPurchasing={toggleExcludeFromPurchasing}
         userRole={user?.role}
         handleReallocate={(id, qty) => handleReallocate(id, qty, stockProducts)}
-        getFreeStock={identifier => getFreeStock(identifier, stockProducts)} isViewing={isViewing} />
+        getFreeStock={identifier => getFreeStock(identifier, stockProducts)} isViewing={isViewing}
+        protocolId={protocolIdRef.current} />
       <FooterAcoes totals={totals} canFinalize={canFinalize} allItemsCount={countUniqueProtocolItems(allItems)}
         isViewing={isViewing} protocolStatus={protocolStatus} isLoading={isFinalizing}
         canSendToBling={canSendToBling} userRole={user?.role}

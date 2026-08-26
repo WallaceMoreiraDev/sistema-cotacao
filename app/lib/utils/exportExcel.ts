@@ -76,7 +76,7 @@ export async function exportProtocolToExcel(items: ProtocolItem[], protocolTitle
     const buffer = await workbook.xlsx.writeBuffer();
     const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     
-    const fileName = protocolTitle ? `Cotacao_${protocolTitle.replace(/[^a-z0-9]/gi, '_')}.xlsx` : `Cotacao_Protocolo_${protocolId || 'Novo'}.xlsx`;
+    const fileName = `Cotacao_Protocolo_${protocolId || 'Novo'}.xlsx`;
     
     saveAs(blob, fileName);
     return { success: true };

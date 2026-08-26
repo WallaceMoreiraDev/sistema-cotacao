@@ -19,6 +19,7 @@ interface TabelaCotacaoProps {
   toggleExcludeFromPurchasing?: (itemId: string) => void;
   userRole?: string;
   isViewing?: boolean;
+  protocolId?: string | number;
 }
 
 export function TabelaCotacao({
@@ -35,6 +36,7 @@ export function TabelaCotacao({
   toggleExcludeFromPurchasing,
   userRole,
   isViewing = false,
+  protocolId,
 }: TabelaCotacaoProps) {
   const isAdmin = userRole === 'admin';
   const [unlockedItems, setUnlockedItems] = useState<Set<string>>(new Set());
@@ -42,7 +44,7 @@ export function TabelaCotacao({
 
   const handleExport = async () => {
     setIsExporting(true);
-    await exportProtocolToExcel(items);
+    await exportProtocolToExcel(items, undefined, protocolId);
     setIsExporting(false);
   };
 
