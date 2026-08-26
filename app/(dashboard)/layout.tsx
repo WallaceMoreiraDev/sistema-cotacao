@@ -1,13 +1,15 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState, useRef } from 'react';
 import { useRouter, usePathname } from 'next/navigation';
 import { useAuth } from '../context/AuthContext';
 
 export default function DashboardLayout({ children }: { children: React.ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
-  const { user, isLoading } = useAuth();
+  const { user, isLoading, logout } = useAuth();
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     if (isLoading) return;
@@ -21,6 +23,16 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
       router.replace('/setup-senha');
     }
   }, [router, user, pathname, isLoading]);
+
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setShowProfileMenu(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   if (isLoading) {
     return (
@@ -38,9 +50,71 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
     return null;
   }
 
+  const getInitials = (name: string) => {
+    return name
+      .split(' ')
+      .map(n => n[0])
+      .slice(0, 2)
+      .join('')
+      .toUpperCase();
+  };
+
   return (
-    <div className="min-h-screen bg-slate-50">
-      <div className="mx-auto max-w-7xl px-4 py-6 lg:px-8">{children}</div>
+    <div className="min-h-screen bg-slate-50 flex flex-col">
+      {/* Global Top Bar */}
+      <header className="bg-white border-b border-slate-200 sticky top-0 z-50 shadow-sm">
+        <div className="mx-auto max-w-7xl px-4 h-16 flex items-center justify-between lg:px-8">
+          <div className="flex items-center gap-3">
+            <div className="h-8 w-8 rounded bg-[#F7C00C] flex items-center justify-center font-bold text-slate-900 shadow-sm">
+              SV
+            </div>
+            <span className="font-bold text-slate-900 hidden sm:block tracking-tight">Sistema Vedações</span>
+          </div>
+
+          <div className="relative" ref={menuRef}>
+            <button
+              onClick={() => setShowProfileMenu(!showProfileMenu)}
+              className="flex items-center gap-3 hover:bg-slate-50 p-1.5 rounded-lg transition-colors border border-transparent hover:border-slate-200"
+            >
+              <div className="flex flex-col items-end hidden sm:flex">
+                <span className="text-sm font-bold text-slate-700 leading-none">{user.name}</span>
+                <span className="text-[10px] text-slate-500 font-medium uppercase tracking-wider mt-1">{user.role}</span>
+              </div>
+              <div className="h-9 w-9 rounded-full bg-slate-100 flex items-center justify-center text-sm font-bold text-slate-600 border border-slate-200 shadow-sm">
+                {getInitials(user.name)}
+              </div>
+            </button>
+
+            {showProfileMenu && (
+              <div className="absolute right-0 mt-2 w-56 bg-white rounded-xl shadow-lg border border-slate-200 overflow-hidden animate-in fade-in slide-in-from-top-2 origin-top-right">
+                <div className="px-4 py-3 border-b border-slate-100 bg-slate-50/50 sm:hidden">
+                  <p className="text-sm font-bold text-slate-700 truncate">{user.name}</p>
+                  <p className="text-[10px] font-medium text-slate-500 uppercase mt-0.5">{user.role}</p>
+                </div>
+                <div className="p-1">
+                  <button
+                    onClick={() => {
+                      setShowProfileMenu(false);
+                      logout();
+                    }}
+                    className="w-full flex items-center gap-2 px-3 py-2 text-sm font-medium text-red-600 hover:bg-red-50 hover:text-red-700 rounded-lg transition-colors"
+                  >
+                    <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
+                    </svg>
+                    Sair do Sistema
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </header>
+
+      {/* Main Content Area */}
+      <main className="flex-1 mx-auto max-w-7xl px-4 py-6 lg:px-8 w-full">
+        {children}
+      </main>
     </div>
   );
 }
