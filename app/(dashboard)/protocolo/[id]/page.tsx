@@ -147,7 +147,7 @@ export default function ProtocolDetailPage() {
         isViewing={isViewing} onClearForm={clearItemForm} handleCreateNewItem={handleCreateNewItem} />
       <TabelaEstoque items={estoqueItems} updateQuantity={updateEstoqueItemQuantity}
         removeItem={removeEstoqueItem} getFreeStock={identifier => getFreeStock(identifier, stockProducts)}
-        onExceedStock={handleExceedStock} isViewing={isViewing} stockProducts={stockProducts} suppliers={suppliers} />
+        onExceedStock={handleExceedStock} isViewing={isViewing} stockProducts={stockProducts} suppliers={suppliers} userRole={user?.role} />
       <TabelaCotacao items={aCotarItems} suppliers={suppliers} estoqueItemsCount={estoqueItems.length}
         updateQuantity={updateACotarItemQuantity} updateSupplierCost={updateSupplierCost}
         removeItem={removeACotarItem} updateItemMarkup={updateItemMarkup}

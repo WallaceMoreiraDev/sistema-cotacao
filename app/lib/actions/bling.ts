@@ -61,7 +61,13 @@ export async function enviarParaBlingAction(protocolId: string | number): Promis
             preco: item.sale_price || item.unit_price,
             situacao: 'A',
             marca: item.brand || '',
-            unidade: 'UN'
+            unidade: 'UN',
+            tipoItem: '00',
+            tributacao: {
+              origem: 0,
+              ncm: '4016.93.00',
+              cest: '01.007.00'
+            }
           });
           blingProductId = newProd.id;
           

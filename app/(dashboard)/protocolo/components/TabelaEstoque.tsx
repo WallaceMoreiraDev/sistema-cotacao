@@ -11,9 +11,10 @@ interface TabelaEstoqueProps {
   isViewing?: boolean;
   stockProducts?: StockProduct[];
   suppliers?: Supplier[];
+  userRole?: string;
 }
 
-export function TabelaEstoque({ items, updateQuantity, removeItem, getFreeStock, onExceedStock, isViewing = false, stockProducts = [], suppliers = [] }: TabelaEstoqueProps) {
+export function TabelaEstoque({ items, updateQuantity, removeItem, getFreeStock, onExceedStock, isViewing = false, stockProducts = [], suppliers = [], userRole }: TabelaEstoqueProps) {
   if (items.length === 0) return null;
 
   return (
@@ -237,7 +238,7 @@ export function TabelaEstoque({ items, updateQuantity, removeItem, getFreeStock,
                   </div>
                 </div>
                 
-                {item.finalTotal && item.finalTotal > 0 && (
+                {item.finalTotal && item.finalTotal > 0 && userRole === 'admin' && (
                   <div className="flex flex-wrap items-center gap-2 bg-slate-50 px-3 py-2 rounded-lg border border-slate-200/60 shadow-sm text-[9px] text-slate-500 w-full mt-2 justify-center">
                     <div className="flex flex-col text-center">
                       <span className="font-bold text-slate-400 uppercase">Forn. Total</span>

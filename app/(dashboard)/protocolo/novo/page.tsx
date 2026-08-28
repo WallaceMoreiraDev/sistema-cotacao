@@ -93,7 +93,11 @@ export default function NewProtocolPage() {
       <TabelaEstoque
         items={estoqueItems} updateQuantity={updateEstoqueItemQuantity}
         removeItem={removeEstoqueItem} getFreeStock={identifier => getFreeStock(identifier, stockProducts)}
-        onExceedStock={handleExceedStock} stockProducts={stockProducts} suppliers={suppliers} />
+        onExceedStock={handleExceedStock}
+        stockProducts={stockProducts}
+        suppliers={suppliers}
+        userRole={user?.role}
+      />
 
       <TabelaCotacao
         items={aCotarItems} suppliers={suppliers}
