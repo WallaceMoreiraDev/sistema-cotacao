@@ -2,7 +2,7 @@ import ExcelJS from 'exceljs';
 import { saveAs } from 'file-saver';
 import type { ProtocolItem } from '../types/database';
 
-export async function exportProtocolToExcel(items: ProtocolItem[], protocolTitle?: string, protocolId?: string | number) {
+export async function exportProtocolToExcel(items: ProtocolItem[], protocolTitle?: string, protocolId?: string | number, customFileName?: string) {
   try {
     // 1. Fetch the template file
     const response = await fetch('/templates/modelo_cotacao.xlsx');
@@ -76,7 +76,7 @@ export async function exportProtocolToExcel(items: ProtocolItem[], protocolTitle
     const buffer = await workbook.xlsx.writeBuffer();
     const blob = new Blob([buffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
     
-    const fileName = `Cotacao_Protocolo_${protocolId || 'Novo'}.xlsx`;
+    const fileName = customFileName || `Cotacao_Protocolo_${protocolId || 'Novo'}.xlsx`;
     
     saveAs(blob, fileName);
     return { success: true };

@@ -139,7 +139,11 @@ async function processProductWebhook(blingId: string | number) {
     const code = product.codigo;
     const price = parseFloat(product.preco || '0');
     
-    const measurements = extractMeasurementsFromName(name);
+    const measurements: any = extractMeasurementsFromName(name) || {};
+    if (product.estoque?.localizacao) {
+      measurements.location = product.estoque.localizacao;
+    }
+
     const partType = extractPartTypeFromName(name);
     const codes = extractCodesFromName(name);
     const brand = extractBrandFromName(name);
@@ -151,6 +155,39 @@ async function processProductWebhook(blingId: string | number) {
     }
     if (categoryName === 'Desconhecida') {
       categoryName = extractCategoryFromName(name);
+    }
+
+    // Tenta mapear o fornecedor do Bling buscando diretamente o vínculo
+    let supplierId = null;
+    const productSuppliers = await BlingService.getProductSuppliers(blingId);
+    let linkedFornecedor = null;
+    
+    for (const link of productSuppliers) {
+      if (link.fornecedor) {
+        if (!linkedFornecedor || link.padrao) {
+          linkedFornecedor = link.fornecedor;
+        }
+      }
+    }
+
+    if (linkedFornecedor) {
+      const blingFornecedorId = linkedFornecedor.id;
+      const blingFornecedorNome = linkedFornecedor.nome;
+      
+      const { data: suppliersData } = await supabase.from('suppliers').select('id, name, bling_id');
+      const suppliers = suppliersData || [];
+
+      let match = suppliers.find(s => s.bling_id && s.bling_id === blingFornecedorId);
+      if (!match && blingFornecedorNome) {
+        const bName = blingFornecedorNome.toLowerCase().trim();
+        match = suppliers.find(s => {
+          const sName = s.name.toLowerCase().trim();
+          return bName === sName || bName.includes(sName) || sName.includes(bName);
+        });
+      }
+      if (match) {
+        supplierId = match.id;
+      }
     }
     
     // Buscar estoque inicial (pois se o usuário colocou estoque na tela de criação, o bling não manda webhook de estoque separado)
@@ -180,6 +217,7 @@ async function processProductWebhook(blingId: string | number) {
       parker_code: codes.parker_code || null,
       supplier_code: codes.supplier_code || null,
       brand: brand || null,
+      supplier_id: supplierId,
       updated_at: new Date().toISOString()
     };
 

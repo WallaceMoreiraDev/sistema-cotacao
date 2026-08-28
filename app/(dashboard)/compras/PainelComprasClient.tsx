@@ -4,6 +4,7 @@ import { useState, useMemo } from 'react';
 import type { Protocol, ProtocolItem } from '../../lib/types/database';
 import { formatCurrency, formatMeasurement } from '../../lib/utils/protocolFormatters';
 import { saveProtocolAction } from '../../lib/actions/crud';
+import { exportProtocolToExcel } from '../../lib/utils/exportExcel';
 
 interface SupplierGroup {
   supplierId: string;
@@ -142,6 +143,16 @@ export default function PainelComprasClient({ initialProtocols, suppliers, userR
     }
   };
 
+  const handleExportSupplier = async (supplierName: string, protocols: any[]) => {
+    try {
+      const allItems = protocols.flatMap(p => p.items);
+      const safeName = supplierName.replace(/[^a-zA-Z0-9 -]/g, '').trim().replace(/\s+/g, '_');
+      await exportProtocolToExcel(allItems, undefined, undefined, `Cotacao_${safeName}.xlsx`);
+    } catch (e: any) {
+      alert('Erro ao exportar: ' + e.message);
+    }
+  };
+
   const toggleItemSelection = (itemId: string, protoId: string | number) => {
     setSelectedItems(prev => {
       const newSel = { ...prev };
@@ -184,6 +195,16 @@ export default function PainelComprasClient({ initialProtocols, suppliers, userR
                   <p className="text-xs font-medium text-slate-500">{group.protocols.length} protocolo(s) pendente(s)</p>
                 </div>
               </div>
+              <button
+                onClick={() => handleExportSupplier(group.supplierName, group.protocols)}
+                className="flex items-center gap-1.5 rounded-lg bg-emerald-500 px-3 py-1.5 text-xs font-bold text-white shadow-sm transition-all hover:bg-emerald-600 hover:shadow"
+                title="Exportar itens deste fornecedor para Excel"
+              >
+                <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3M3 17V7a2 2 0 012-2h6l2 2h6a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2z" />
+                </svg>
+                Exportar Excel
+              </button>
             </div>
 
             <div className="divide-y divide-slate-100">

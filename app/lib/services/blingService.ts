@@ -210,6 +210,46 @@ export class BlingService {
   }
 
   /**
+   * Fetch all product-supplier links from Bling
+   */
+  static async getAllProductSuppliers() {
+    let allLinks: any[] = [];
+    let page = 1;
+    let hasMore = true;
+
+    while (hasMore) {
+      const response = await this.request(`/produtos/fornecedores?pagina=${page}&limite=100`);
+      if (!response.ok) {
+        console.error('Falha ao buscar fornecedores de produtos do Bling');
+        break;
+      }
+      const result = await response.json();
+      const data = result.data || [];
+      
+      allLinks = allLinks.concat(data);
+
+      if (data.length < 100) {
+        hasMore = false;
+      } else {
+        page++;
+        await new Promise(res => setTimeout(res, 333));
+      }
+    }
+
+    return allLinks;
+  }
+
+  /**
+   * Fetch suppliers for a specific product from Bling
+   */
+  static async getProductSuppliers(productId: string | number) {
+    const response = await this.request(`/produtos/fornecedores?idProduto[]=${productId}`);
+    if (!response.ok) return [];
+    const result = await response.json();
+    return result.data || [];
+  }
+
+  /**
    * Fetch a single product by ID
    */
   static async getProduct(id: string | number) {
@@ -319,6 +359,28 @@ export class BlingService {
     
     const result = await response.json();
     return result.data;
+  }
+
+  /**
+   * Links a supplier to a product with a cost price
+   */
+  static async addSupplierToProduct(produtoId: number | string, fornecedorId: number | string, precoCusto: number) {
+    const payload = {
+      produto: { id: Number(produtoId) },
+      fornecedor: { id: Number(fornecedorId) },
+      precoCusto: precoCusto,
+      padrao: true
+    };
+    
+    const response = await this.request('/produtos/fornecedores', {
+      method: 'POST',
+      body: JSON.stringify(payload)
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      console.error(`Falha ao vincular fornecedor ao produto no Bling: ${response.status} - ${errText}`);
+    }
   }
 
   /**

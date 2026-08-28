@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react';
+import { useState, useCallback, useEffect, useRef } from 'react';
 import type { ProtocolItem, StockProduct } from '../types/database';
 import { areItemsMatching, formatMeasurement } from '../utils/protocolFormatters';
 import { buildSmartDescription, generateFMCode } from '../utils/productNameBuilder';
@@ -12,13 +12,24 @@ export function getItemIdentifier(item: any): string {
   return item.code || item.sku || item.name || '';
 }
 
-export function useProtocolState(initialEstoque: ProtocolItem[] = [], initialACotar: ProtocolItem[] = [], suppliers: SupplierRow[] = [], userRole?: string) {
+export function useProtocolState(
+  initialEstoque: ProtocolItem[] = [],
+  initialCotar: ProtocolItem[] = [],
+  suppliers: any[] = [],
+  userRole?: string,
+  initialSupplierFreights: Record<string, number> = {}
+) {
   const [estoqueItems, setEstoqueItems] = useState<ProtocolItem[]>(initialEstoque);
-  const [aCotarItems, setACotarItems] = useState<ProtocolItem[]>(initialACotar);
-  const [itemCounter, setItemCounter] = useState(0);
-
+  const [aCotarItems, setACotarItems] = useState<ProtocolItem[]>(initialCotar);
   const [itemForm, setItemForm] = useState<ItemFormState>(EMPTY_ITEM_FORM);
   const [addFeedback, setAddFeedback] = useState<string | null>(null);
+  const [supplierFreights, setSupplierFreights] = useState<Record<string, number>>(initialSupplierFreights);
+
+  const [itemCounter, setItemCounter] = useState(0);
+
+  const updateSupplierFreight = useCallback((supplierId: string, cost: number) => {
+    setSupplierFreights(prev => ({ ...prev, [supplierId]: cost }));
+  }, []);
 
   const getFreeStock = useCallback((identifier: string, stockProducts: StockProduct[]) => {
     const product = stockProducts.find(p => getItemIdentifier(p) === identifier);
@@ -127,7 +138,7 @@ export function useProtocolState(initialEstoque: ProtocolItem[] = [], initialACo
         quantity: qty,
         unitPrice: 0,
         costPrice: (!itemForm.ignoreStock && match) ? match.costPrice : undefined,
-        productId: (!itemForm.ignoreStock && match) ? match.id : undefined,
+        productId: match ? match.id : undefined,
         type: 'a_cotar',
         status: 'pendente',
         oem_code: itemForm.oemCode || undefined,
@@ -801,8 +812,7 @@ export function useProtocolState(initialEstoque: ProtocolItem[] = [], initialACo
         }, 0);
 
         const peso = totalSubtotalBaseSupplier > 0 ? (subtotalBaseLinha / totalSubtotalBaseSupplier) : 0;
-        const supplierRow = suppliers.find(s => String(s.id) === supId);
-        const freightCost = supplierRow?.freight_cost || 0;
+        const freightCost = supplierFreights[supId] || 0;
         rateioFrete = freightCost * peso;
         
         // Item misto (travado pelo estoque) não repassa o frete pro cliente no preço final
@@ -917,13 +927,17 @@ export function useProtocolState(initialEstoque: ProtocolItem[] = [], initialACo
       setEstoqueItems(newEstoque);
     }
 
-  }, [aCotarItems, estoqueItems, suppliers]); // Dependências completas
+  }, [aCotarItems, estoqueItems, suppliers, supplierFreights]); // Dependências completas
 
   return {
     estoqueItems,
     setEstoqueItems,
     aCotarItems,
     setACotarItems,
+    supplierFreights,
+    setSupplierFreights,
+    updateSupplierFreight,
+    itemCounter,
     itemForm,
     setItemForm,
     addFeedback,

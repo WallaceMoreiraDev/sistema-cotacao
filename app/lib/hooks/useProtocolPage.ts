@@ -63,6 +63,7 @@ export function useProtocolPage({
     splitMultipleEstoqueItems, removeACotarItem, updateACotarItemQuantity,
     updateSupplierCost, forceItemSupplier, toggleExcludeFromPurchasing, updateItemMarkup, updateItemField, updateMeasurement,
     clearItemForm, handleCreateNewItem,
+    supplierFreights, setSupplierFreights, updateSupplierFreight
   } = useProtocolState([], [], suppliers, userRole);
 
   const allItems = useMemo(() => [...estoqueItems, ...aCotarItems], [estoqueItems, aCotarItems]);
@@ -108,7 +109,7 @@ export function useProtocolPage({
 
   useEffect(() => {
     if (!isViewing) isDirtyRef.current = true;
-  }, [allItems, clientName, protocolTitle, itemForm, isViewing]);
+  }, [allItems, clientName, protocolTitle, itemForm, isViewing, supplierFreights]);
 
   useEffect(() => {
     if (isViewing || isFinalizing || isFinalizingRef.current) return;
@@ -124,6 +125,7 @@ export function useProtocolPage({
         title: protocolTitle.trim() || undefined, items: allItems,
         totals: { subtotal: totalsObj.subtotal, markup: totalsObj.markup, total: totalsObj.total },
         status: protocolStatus, draftForm: itemForm,
+        supplierFreights,
       });
       const res = await queueSaveProtocol(protocol);
       if (res.success && res.data) protocolIdRef.current = res.data.id;
@@ -131,7 +133,7 @@ export function useProtocolPage({
       setTimeout(() => setAutoSaveStatus('idle'), 2000);
     }, AUTOSAVE_DELAY);
     return () => { if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current); };
-  }, [allItems, clientName, protocolTitle, itemForm, isViewing, isFinalizing, protocolStatus, queueSaveProtocol]);
+  }, [allItems, clientName, protocolTitle, itemForm, isViewing, isFinalizing, protocolStatus, queueSaveProtocol, supplierFreights]);
 
   const handleSaveDraft = useCallback(async (
     forcedEstoque?: ProtocolItem[], forcedACotar?: ProtocolItem[], options?: { skipDiffLog?: boolean }
@@ -148,6 +150,7 @@ export function useProtocolPage({
         title: protocolTitle.trim() || undefined, items: [...finalEstoque, ...finalACotar],
         totals: { subtotal: totalsObj.subtotal, markup: totalsObj.markup, total: totalsObj.total },
         status: protocolStatus, draftForm: itemForm,
+        supplierFreights,
       }), options);
       toast.success('Rascunho salvo com sucesso!');
       if (navigateAfterSave) router.push(`/protocolo/${protocolIdRef.current}`);
@@ -171,6 +174,7 @@ export function useProtocolPage({
         title: protocolTitle.trim() || undefined, items: [...finalEstoque, ...finalACotar],
         totals: { subtotal: totalsObj.subtotal, markup: totalsObj.markup, total: totalsObj.total },
         status: protocolStatus, draftForm: itemForm,
+        supplierFreights,
       }), options);
       const res = await reservarEstoqueAction(protocolIdRef.current);
       if (res.success) {
@@ -330,6 +334,9 @@ export function useProtocolPage({
     removeACotarItem, updateACotarItemQuantity, updateSupplierCost,
     forceItemSupplier, toggleExcludeFromPurchasing, updateItemMarkup, updateItemField, updateMeasurement, clearItemForm,
     handleCreateNewItem, allItems,
+    supplierFreights,
+    setSupplierFreights,
+    updateSupplierFreight,
     isFormUnlocked, isItemFormValid, canFinalize, canSendToBling,
     handleSaveDraft, handleReservarEstoque, handleEnviarBling,
     handleCancelar, confirmCancelar, handleRestaurar, handleEstornar,

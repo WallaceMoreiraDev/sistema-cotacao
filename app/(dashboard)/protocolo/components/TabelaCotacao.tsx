@@ -1,7 +1,7 @@
 import { useState } from 'react';
-import type { ProtocolItem } from '../../../lib/types/database';
+import type { ProtocolItem, StockProduct } from '../../../lib/types/database';
 import type { SupplierRow } from '../../../lib/actions/suppliers';
-import { formatCurrency, formatMeasurement } from '../../../lib/utils/protocolFormatters';
+import { formatCurrency, formatMeasurement, areItemsMatching } from '../../../lib/utils/protocolFormatters';
 import { getDefaultMarkup } from '../../../lib/config/suppliers';
 import { exportProtocolToExcel } from '../../../lib/utils/exportExcel';
 
@@ -20,6 +20,7 @@ interface TabelaCotacaoProps {
   userRole?: string;
   isViewing?: boolean;
   protocolId?: string | number;
+  stockProducts?: StockProduct[];
 }
 
 export function TabelaCotacao({
@@ -37,6 +38,7 @@ export function TabelaCotacao({
   userRole,
   isViewing = false,
   protocolId,
+  stockProducts = [],
 }: TabelaCotacaoProps) {
   const isAdmin = userRole === 'admin';
   const [unlockedItems, setUnlockedItems] = useState<Set<string>>(new Set());
@@ -238,25 +240,45 @@ export function TabelaCotacao({
                   
                   {/* Left: Vencedor e Alertas */}
                   <div className="flex flex-col gap-2">
-                    <div className="flex items-center gap-3">
-                      {item.costPrice && item.costPrice > 0 ? (
-                        <span className="text-[10px] font-bold text-amber-700 bg-amber-100 px-2 py-1 rounded flex items-center gap-1 border border-amber-200 shadow-sm">
-                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
-                          Venda travada pelo custo do estoque
-                        </span>
-                      ) : (
-                        <div className="text-[11px] text-slate-400 font-medium italic">Sem custo base travado</div>
-                      )}
-                      
-                      {canReallocate && (
-                        <button
-                          type="button"
-                          onClick={() => handleReallocate(item.id, freeStock)}
-                          className="text-[10px] font-bold text-amber-600 bg-amber-50 hover:bg-amber-100 px-2 py-1 rounded border border-amber-200 transition-colors"
-                        >
-                          Aproveitar {freeStock} un. Estoque
-                        </button>
-                      )}
+                    <div className="flex flex-col gap-1.5">
+                      <div className="flex items-center gap-3">
+                        {item.costPrice && item.costPrice > 0 ? (
+                          <span className="text-[10px] font-bold text-amber-700 bg-amber-100 px-2 py-1 rounded flex items-center gap-1 border border-amber-200 shadow-sm w-fit">
+                            <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+                            Venda travada pelo custo do estoque
+                          </span>
+                        ) : (
+                          <div className="text-[11px] text-slate-400 font-medium italic">Sem custo base travado</div>
+                        )}
+                        
+                        {canReallocate && (
+                          <button
+                            type="button"
+                            onClick={() => handleReallocate(item.id, freeStock)}
+                            className="text-[10px] font-bold text-amber-600 bg-amber-50 hover:bg-amber-100 px-2 py-1 rounded border border-amber-200 transition-colors"
+                          >
+                            Aproveitar {freeStock} un. Estoque
+                          </button>
+                        )}
+                      </div>
+
+                      {(() => {
+                        const originalProduct = stockProducts.find(p => areItemsMatching(p as any, item as any));
+                        const originalSupplier = originalProduct ? suppliers.find(s => String(s.id) === String(originalProduct.supplierId)) : undefined;
+                        const hasCost = originalProduct && !!originalProduct.costPrice && originalProduct.costPrice > 0;
+                        
+                        return (
+                          <div className="flex items-center gap-1.5 text-[10px] bg-white border border-slate-200 px-2 py-1 rounded shadow-sm w-fit mt-0.5">
+                            <span className="font-semibold text-slate-500">Custo Ref. Catálogo:</span>
+                            <span className="text-slate-700 font-bold">{hasCost ? formatCurrency(originalProduct!.costPrice) : '-'}</span>
+                            <span className="text-slate-300 mx-0.5">|</span>
+                            <span className="font-semibold text-slate-500">Fornecedor Padrão:</span>
+                            <span className={originalSupplier ? "text-slate-700 font-bold" : "text-slate-400 italic"}>
+                              {originalSupplier ? originalSupplier.name : 'Não informado'}
+                            </span>
+                          </div>
+                        );
+                      })()}
                     </div>
                     
                     {/* Right: Ações Rápidas — wrapped in its own fieldset to escape parent disabled */}

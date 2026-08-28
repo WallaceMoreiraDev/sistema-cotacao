@@ -23,6 +23,7 @@ export interface StockProduct {
   supplierId?: string;
   heldBy?: StockHolder[];
   measurements?: {
+    location?: string;
     innerDiameter?: number;
     outerDiameter?: number;
     height1?: number;
@@ -58,6 +59,7 @@ export interface ProtocolItem {
   parker_code?: string;
   description?: string; // Nome inteligente gerado
   measurements?: {
+    location?: string;
     innerDiameter?: number;
     outerDiameter?: number;
     height1?: number;
@@ -104,6 +106,7 @@ export interface Protocol {
     totalTax?: number;
     totalFreight?: number;
   };
+  supplierFreights?: Record<string, number>;
   draftForm?: any; // To hold the unsubmitted item form state
 }
 

@@ -1,4 +1,5 @@
-import type { ProtocolItem } from '../../../lib/types/database';
+import React from 'react';
+import type { ProtocolItem, StockProduct, Supplier } from '../../../lib/types/database';
 import { formatCurrency, formatMeasurement } from '../../../lib/utils/protocolFormatters';
 
 interface TabelaEstoqueProps {
@@ -8,9 +9,11 @@ interface TabelaEstoqueProps {
   getFreeStock: (identifier: string) => number;
   onExceedStock: (item: ProtocolItem, requestedQty: number, maxTotalQty: number) => void;
   isViewing?: boolean;
+  stockProducts?: StockProduct[];
+  suppliers?: Supplier[];
 }
 
-export function TabelaEstoque({ items, updateQuantity, removeItem, getFreeStock, onExceedStock, isViewing = false }: TabelaEstoqueProps) {
+export function TabelaEstoque({ items, updateQuantity, removeItem, getFreeStock, onExceedStock, isViewing = false, stockProducts = [], suppliers = [] }: TabelaEstoqueProps) {
   if (items.length === 0) return null;
 
   return (
@@ -49,16 +52,23 @@ export function TabelaEstoque({ items, updateQuantity, removeItem, getFreeStock,
               </thead>
               <tbody className="divide-y divide-slate-100">
                 {items.map((item, idx) => (
-                  <tr key={item.id} className="hover:bg-slate-50/60 transition">
-                    <td className="px-4 py-3 font-mono font-bold text-slate-400">{idx + 1}</td>
+                  <React.Fragment key={item.id}>
+                  <tr className="hover:bg-slate-50/60 transition border-b-0">
+                    <td className="px-4 py-3 font-mono font-bold text-slate-400 border-b-0">{idx + 1}</td>
                     <td className="px-4 py-3">
                       <div className="flex flex-col">
                         <span className="font-semibold text-slate-800">{item.name}</span>
-                        {(item.brand || item.oem || item.nickname) && (
+                        {(item.brand || item.oem || item.nickname || item.measurements?.location) && (
                           <div className="flex flex-wrap items-center gap-1.5 mt-0.5 text-[9px]">
                             {item.brand && <span className="text-slate-500 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded">Marca: {item.brand}</span>}
                             {item.oem && <span className="text-slate-500 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded">OEM: {item.oem}</span>}
                             {item.nickname && <span className="text-slate-400 italic">"{item.nickname}"</span>}
+                            {item.measurements?.location && (
+                              <span className="text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded flex items-center gap-1">
+                                <svg className="w-2.5 h-2.5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                                {item.measurements.location}
+                              </span>
+                            )}
                           </div>
                         )}
                       </div>
@@ -110,6 +120,39 @@ export function TabelaEstoque({ items, updateQuantity, removeItem, getFreeStock,
                       )}
                     </td>
                   </tr>
+                  <tr className="border-b border-slate-100 bg-slate-50/10">
+                    <td colSpan={13} className="px-4 pb-3 pt-1">
+                      {item.finalTotal && item.finalTotal > 0 && (
+                        <div className="flex items-center gap-3 bg-white px-3 py-1.5 rounded border border-slate-200/60 shadow-sm text-[9px] text-slate-500 w-fit ml-auto">
+                          <div className="flex flex-col">
+                            <span className="font-bold text-slate-400 uppercase">Custo Forn. Total</span>
+                            <span className="text-slate-700 font-medium">{formatCurrency((item.unitPrice || 0) * Number(item.quantity))}</span>
+                          </div>
+                          <div className="h-6 w-px bg-slate-200" />
+                          <div className="flex flex-col">
+                            <span className="font-bold text-slate-400 uppercase">Sub. Base (Venda)</span>
+                            <span className="text-slate-700 font-medium">{formatCurrency(item.baseSubtotal || 0)}</span>
+                          </div>
+                          <div className="h-6 w-px bg-slate-200" />
+                          <div className="flex flex-col">
+                            <span className="font-bold text-slate-400 uppercase">+ Imposto</span>
+                            <span className="text-rose-600 font-medium">{formatCurrency(item.taxAmount || 0)}</span>
+                          </div>
+                          <div className="h-6 w-px bg-slate-200" />
+                          <div className="flex flex-col">
+                            <span className="font-bold text-slate-400 uppercase">+ Frete</span>
+                            <span className="text-amber-600 font-medium">{formatCurrency(item.freightAmount || 0)}</span>
+                          </div>
+                          <div className="h-6 w-px bg-slate-200" />
+                          <div className="flex flex-col">
+                            <span className="font-bold text-slate-400 uppercase">= Final</span>
+                            <span className="text-amber-500 font-bold">{formatCurrency(item.finalTotal || 0)}</span>
+                          </div>
+                        </div>
+                      )}
+                    </td>
+                  </tr>
+                  </React.Fragment>
                 ))}
               </tbody>
             </table>
@@ -136,12 +179,18 @@ export function TabelaEstoque({ items, updateQuantity, removeItem, getFreeStock,
                     <span className="bg-emerald-100 text-emerald-700 text-[10px] font-bold px-2 py-0.5 rounded-full">#{idx + 1}</span>
                     <span className="font-bold text-slate-800 text-sm">{item.name}</span>
                   </div>
-                  {(item.brand || item.oem || item.nickname || item.code) && (
+                  {(item.brand || item.oem || item.nickname || item.code || item.measurements?.location) && (
                     <div className="flex flex-wrap items-center gap-1.5 mt-2 text-[10px]">
-                      {item.code && <span className="text-slate-600 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded">Cód: <span className="font-semibold">{item.code}</span></span>}
-                      {item.brand && <span className="text-slate-600 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded">Marca: {item.brand}</span>}
-                      {item.oem && <span className="text-slate-600 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded">OEM: {item.oem}</span>}
-                      {item.nickname && <span className="text-slate-500 italic">"{item.nickname}"</span>}
+                      {item.code && <span className="text-slate-500 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded">Cód: {item.code}</span>}
+                      {item.brand && <span className="text-slate-500 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded">Marca: {item.brand}</span>}
+                      {item.oem && <span className="text-slate-500 bg-slate-100 border border-slate-200 px-1.5 py-0.5 rounded">OEM: {item.oem}</span>}
+                      {item.nickname && <span className="text-slate-400 italic">"{item.nickname}"</span>}
+                      {item.measurements?.location && (
+                        <span className="text-amber-700 bg-amber-50 border border-amber-200 px-1.5 py-0.5 rounded flex items-center gap-1">
+                          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
+                          {item.measurements.location}
+                        </span>
+                      )}
                     </div>
                   )}
                 </div>
@@ -187,6 +236,35 @@ export function TabelaEstoque({ items, updateQuantity, removeItem, getFreeStock,
                     </span>
                   </div>
                 </div>
+                
+                {item.finalTotal && item.finalTotal > 0 && (
+                  <div className="flex flex-wrap items-center gap-2 bg-slate-50 px-3 py-2 rounded-lg border border-slate-200/60 shadow-sm text-[9px] text-slate-500 w-full mt-2 justify-center">
+                    <div className="flex flex-col text-center">
+                      <span className="font-bold text-slate-400 uppercase">Forn. Total</span>
+                      <span className="text-slate-700 font-medium">{formatCurrency((item.unitPrice || 0) * Number(item.quantity))}</span>
+                    </div>
+                    <div className="h-6 w-px bg-slate-200" />
+                    <div className="flex flex-col text-center">
+                      <span className="font-bold text-slate-400 uppercase">Sub. Venda</span>
+                      <span className="text-slate-700 font-medium">{formatCurrency(item.baseSubtotal || 0)}</span>
+                    </div>
+                    <div className="h-6 w-px bg-slate-200" />
+                    <div className="flex flex-col text-center">
+                      <span className="font-bold text-slate-400 uppercase">+ Imp.</span>
+                      <span className="text-rose-600 font-medium">{formatCurrency(item.taxAmount || 0)}</span>
+                    </div>
+                    <div className="h-6 w-px bg-slate-200" />
+                    <div className="flex flex-col text-center">
+                      <span className="font-bold text-slate-400 uppercase">+ Frete</span>
+                      <span className="text-amber-600 font-medium">{formatCurrency(item.freightAmount || 0)}</span>
+                    </div>
+                    <div className="h-6 w-px bg-slate-200" />
+                    <div className="flex flex-col text-center">
+                      <span className="font-bold text-slate-400 uppercase">= Final</span>
+                      <span className="text-amber-500 font-bold">{formatCurrency(item.finalTotal || 0)}</span>
+                    </div>
+                  </div>
+                )}
               </div>
             ))}
           </div>

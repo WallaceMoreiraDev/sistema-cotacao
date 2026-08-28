@@ -53,6 +53,7 @@ function mapRowsToProtocol(protoRow: any, itemRows: any[] = []): Protocol {
     createdAt: protoRow.created_at || new Date().toISOString(),
     updatedAt: protoRow.updated_at || new Date().toISOString(),
     draftForm: protoRow.draft_form || undefined,
+    supplierFreights: protoRow.supplier_freights || {},
     items,
     totals: {
       subtotal,
@@ -171,6 +172,7 @@ export async function saveProtocolAction(protocol: Protocol, options?: { skipDif
       status: protocol.status || 'nao_reservado',
       total_venda: totalVenda,
       draft_form: protocol.draftForm || null,
+      supplier_freights: protocol.supplierFreights || {},
       updated_at: new Date().toISOString(),
     };
 

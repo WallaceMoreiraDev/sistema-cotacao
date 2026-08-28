@@ -20,6 +20,7 @@ import { ModalDivisaoEstoque } from '../components/ModalDivisaoEstoque';
 import { ModalDeficitEstoque } from '../components/ModalDeficitEstoque';
 import { ModalCancelar } from '../components/ModalCancelar';
 import { FooterAcoes } from '../components/FooterAcoes';
+import GestaoFretes from '../components/GestaoFretes';
 
 export default function ProtocolDetailPage() {
   const params = useParams<{ id: string }>();
@@ -59,6 +60,7 @@ export default function ProtocolDetailPage() {
     reallocatableItems, insufficientStockItems,
     handleExceedStock, handleConfirmSplit,
     handleConfirmDeficit, handleConfirmRealloc, handleConfirmIgnore,
+    supplierFreights, setSupplierFreights, updateSupplierFreight,
   } = useProtocolPage({
     protocolId: params?.id,
     initialViewing: true,
@@ -89,6 +91,7 @@ export default function ProtocolDetailPage() {
           setEstoqueItems(p.items?.filter(i => i.type === 'estoque') || []);
           setACotarItems(p.items?.filter(i => i.type === 'a_cotar') || []);
           if (p.draftForm) setItemForm(p.draftForm as ItemFormState);
+          setSupplierFreights(p.supplierFreights || {});
         }
         setIsProtocolLoading(false);
       });
@@ -96,7 +99,7 @@ export default function ProtocolDetailPage() {
       setIsViewing(false);
       setIsProtocolLoading(false);
     }
-  }, [params.id, setEstoqueItems, setACotarItems, setItemForm, setClientName, setProtocolTitle, setProtocolStatus, setIsViewing, protocolIdRef]);
+  }, [params.id, setEstoqueItems, setACotarItems, setItemForm, setClientName, setProtocolTitle, setProtocolStatus, setIsViewing, protocolIdRef, setSupplierFreights]);
   const totals = calculateTotals(allItems);
   if (isProtocolLoading) {
     return (
@@ -144,16 +147,26 @@ export default function ProtocolDetailPage() {
         isViewing={isViewing} onClearForm={clearItemForm} handleCreateNewItem={handleCreateNewItem} />
       <TabelaEstoque items={estoqueItems} updateQuantity={updateEstoqueItemQuantity}
         removeItem={removeEstoqueItem} getFreeStock={identifier => getFreeStock(identifier, stockProducts)}
-        onExceedStock={handleExceedStock} isViewing={isViewing} />
+        onExceedStock={handleExceedStock} isViewing={isViewing} stockProducts={stockProducts} suppliers={suppliers} />
       <TabelaCotacao items={aCotarItems} suppliers={suppliers} estoqueItemsCount={estoqueItems.length}
         updateQuantity={updateACotarItemQuantity} updateSupplierCost={updateSupplierCost}
         removeItem={removeACotarItem} updateItemMarkup={updateItemMarkup}
         forceItemSupplier={forceItemSupplier}
         toggleExcludeFromPurchasing={toggleExcludeFromPurchasing}
         userRole={user?.role}
+        stockProducts={stockProducts}
         handleReallocate={(id, qty) => handleReallocate(id, qty, stockProducts)}
         getFreeStock={identifier => getFreeStock(identifier, stockProducts)} isViewing={isViewing}
         protocolId={protocolIdRef.current} />
+        
+      <GestaoFretes
+        aCotarItems={aCotarItems}
+        suppliers={suppliers}
+        supplierFreights={supplierFreights}
+        updateSupplierFreight={updateSupplierFreight}
+        isViewing={isViewing}
+      />
+
       <FooterAcoes totals={totals} canFinalize={canFinalize} allItemsCount={countUniqueProtocolItems(allItems)}
         isViewing={isViewing} protocolStatus={protocolStatus} isLoading={isFinalizing}
         canSendToBling={canSendToBling} userRole={user?.role}

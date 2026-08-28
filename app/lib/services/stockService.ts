@@ -48,7 +48,8 @@ export async function fetchStock(): Promise<StockProduct[]> {
       part_type: row.part_type || undefined,
       parker_code: row.parker_code || undefined,
       oem_code: row.oem_code || undefined,
-      supplier_code: row.supplier_code || undefined
+      supplier_code: row.supplier_code || undefined,
+      supplierId: row.supplier_id || undefined,
     }));
   } catch (err) {
     console.error('Exception in fetchStock:', err);

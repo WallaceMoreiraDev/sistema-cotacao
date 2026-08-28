@@ -2,14 +2,14 @@
 
 import { createClient } from '../supabase/server';
 import { redirect } from 'next/navigation';
-import { headers } from 'next/headers';
+import { headers, cookies } from 'next/headers';
 
-export async function logAuthEvent(action: string, overrideUserId?: string) {
+export async function logAuthEvent(action: string, overrideUserId?: string | null) {
   try {
     const supabase = await createClient();
     
     let userId = overrideUserId;
-    if (!userId) {
+    if (overrideUserId === undefined) {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) return { success: false, message: 'Nenhum usuário logado.' };
       userId = user.id;
@@ -48,6 +48,23 @@ export async function login(formData: FormData) {
     return { error: 'E-mail e senha são obrigatórios.' };
   }
 
+  const cookieStore = await cookies();
+  const lockoutCookie = cookieStore.get('login_lockout');
+  let attempts = parseInt(cookieStore.get('login_attempts')?.value || '0', 10);
+
+  if (lockoutCookie) {
+    const lockoutTime = new Date(lockoutCookie.value);
+    const now = new Date();
+    if (now < lockoutTime) {
+      const remaining = Math.ceil((lockoutTime.getTime() - now.getTime()) / 60000);
+      return { error: `Muitas tentativas. Tente novamente em ${remaining} minuto(s).` };
+    } else {
+      cookieStore.delete('login_lockout');
+      cookieStore.delete('login_attempts');
+      attempts = 0;
+    }
+  }
+
   const supabase = await createClient();
 
   const { data, error } = await supabase.auth.signInWithPassword({
@@ -56,9 +73,26 @@ export async function login(formData: FormData) {
   });
 
   if (error) {
-    console.error("Login error details:", error.message, error.status);
-    // SECURITY FIX: Never expose exact reasons to prevent enumeration attacks
-    return { error: 'E-mail ou senha incorretos.' };
+    attempts += 1;
+    
+    if (attempts >= 5) {
+      const lockoutUntil = new Date(Date.now() + 5 * 60 * 1000);
+      cookieStore.set('login_lockout', lockoutUntil.toISOString(), { httpOnly: true, path: '/' });
+      cookieStore.delete('login_attempts');
+      await logAuthEvent(`RATE_LIMIT_EXCEEDED: ${email}`, null);
+      return { error: 'Tentativas esgotadas. Conta bloqueada por 5 minutos.' };
+    } else {
+      cookieStore.set('login_attempts', attempts.toString(), { httpOnly: true, path: '/' });
+      if (attempts === 4) {
+        return { error: 'E-mail ou senha incorretos. Aviso: Você tem apenas mais 1 tentativa.' };
+      }
+      return { error: 'E-mail ou senha incorretos.' };
+    }
+  }
+
+  // Clear attempts on success
+  if (attempts > 0) {
+    cookieStore.delete('login_attempts');
   }
 
   // Record login event and check status

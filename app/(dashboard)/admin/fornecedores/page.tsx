@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { getSuppliersAction, createSupplierAction, updateSupplierAction, deleteSupplierAction, SupplierRow } from '@/app/lib/actions/suppliers';
+import { syncSuppliersFromHardcodedListAction } from '@/app/lib/actions/sync';
 import { toast } from 'react-hot-toast';
 
 export default function AdminFornecedoresPage() {
@@ -13,12 +14,10 @@ export default function AdminFornecedoresPage() {
 
   const [newName, setNewName] = useState('');
   const [newType, setNewType] = useState('Fornecedor Original');
-  const [newFreightCost, setNewFreightCost] = useState('');
 
   const [editingId, setEditingId] = useState<string | null>(null);
   const [editName, setEditName] = useState('');
   const [editType, setEditType] = useState('');
-  const [editFreightCost, setEditFreightCost] = useState('');
 
   const loadSuppliers = async () => {
     setIsLoading(true);
@@ -37,12 +36,10 @@ export default function AdminFornecedoresPage() {
     e.preventDefault();
     if (!newName.trim()) return;
     setIsSubmitting(true);
-    const freightNum = parseFloat(newFreightCost) || 0;
-    const res = await createSupplierAction(newName.trim(), newType, freightNum);
+    const res = await createSupplierAction(newName.trim(), newType);
     if (res.success) {
       toast.success('Fornecedor cadastrado!');
       setNewName('');
-      setNewFreightCost('');
       setIsAdding(false);
       loadSuppliers();
     } else {
@@ -55,7 +52,6 @@ export default function AdminFornecedoresPage() {
     setIsAdding(false);
     setNewName('');
     setNewType('Fornecedor Original');
-    setNewFreightCost('');
   };
 
   const handleDelete = async (id: string) => {
@@ -73,7 +69,6 @@ export default function AdminFornecedoresPage() {
     setEditingId(sup.id);
     setEditName(sup.name);
     setEditType(sup.type);
-    setEditFreightCost(sup.freight_cost ? sup.freight_cost.toString() : '');
   };
 
   const cancelEdit = () => {
@@ -84,8 +79,7 @@ export default function AdminFornecedoresPage() {
     e.preventDefault();
     if (!editingId || !editName.trim()) return;
     setIsSubmitting(true);
-    const freightNum = parseFloat(editFreightCost) || 0;
-    const res = await updateSupplierAction(editingId, editName.trim(), editType, freightNum);
+    const res = await updateSupplierAction(editingId, editName.trim(), editType);
     if (res.success) {
       toast.success('Fornecedor atualizado!');
       setEditingId(null);
@@ -94,6 +88,28 @@ export default function AdminFornecedoresPage() {
       toast.error('Erro ao atualizar: ' + res.error);
     }
     setIsSubmitting(false);
+  };
+
+  const [isSyncing, setIsSyncing] = useState(false);
+
+  const handleSyncSuppliers = async () => {
+    try {
+      setIsSyncing(true);
+      const toastId = toast.loading('Sincronizando fornecedores...');
+      
+      const res = await syncSuppliersFromHardcodedListAction();
+      
+      if (res.success) {
+        toast.success(res.message || 'Sincronização concluída', { id: toastId });
+        await loadSuppliers();
+      } else {
+        toast.error(res.error || 'Erro na sincronização', { id: toastId });
+      }
+    } catch (error) {
+      toast.error('Erro de conexão ao sincronizar.');
+    } finally {
+      setIsSyncing(false);
+    }
   };
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -134,6 +150,16 @@ export default function AdminFornecedoresPage() {
                 </svg>
               </div>
               <button
+                onClick={handleSyncSuppliers}
+                disabled={isSyncing}
+                className="inline-flex shrink-0 items-center gap-2 rounded-2xl bg-emerald-100 px-6 py-3 text-sm font-bold text-emerald-700 shadow-sm transition-all hover:bg-emerald-200 disabled:opacity-50 whitespace-nowrap"
+              >
+                <svg className={`h-5 w-5 ${isSyncing ? 'animate-spin' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                {isSyncing ? 'Sincronizando...' : 'Sincronizar Lista Oculta'}
+              </button>
+              <button
                 onClick={() => setIsAdding(true)}
                 className="inline-flex shrink-0 items-center gap-2 rounded-2xl bg-slate-900 px-6 py-3 text-sm font-bold text-white shadow-xl shadow-slate-900/20 transition-all hover:bg-slate-800 hover:-translate-y-0.5 focus:ring-2 focus:ring-slate-900 focus:ring-offset-2 whitespace-nowrap"
               >
@@ -160,7 +186,7 @@ export default function AdminFornecedoresPage() {
             </div>
             
             <form onSubmit={handleCreate} className="space-y-6">
-              <div className="grid gap-5 sm:grid-cols-3">
+              <div className="grid gap-5 sm:grid-cols-2">
                 <div className="group">
                   <label className="block text-xs font-semibold text-slate-500 uppercase tracking-widest mb-2">
                     Nome da Empresa *
@@ -199,22 +225,6 @@ export default function AdminFornecedoresPage() {
                   </div>
                 </div>
 
-                <div className="group">
-                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-widest mb-2">
-                    Frete Padrão (R$)
-                  </label>
-                  <div className="relative">
-                    <input
-                      type="number"
-                      step="0.01"
-                      min="0"
-                      value={newFreightCost}
-                      onChange={(e) => setNewFreightCost(e.target.value)}
-                      placeholder="Ex: 50.00"
-                      className="block w-full rounded-xl border border-slate-200 bg-white py-3.5 px-4 text-sm font-semibold text-slate-800 outline-none transition-all placeholder:text-slate-400 placeholder:font-normal focus:border-emerald-500 focus:bg-white focus:ring-4 focus:ring-emerald-500/10 shadow-sm"
-                    />
-                  </div>
-                </div>
               </div>
 
               <div className="flex items-center gap-3 pt-2 justify-end border-t border-emerald-200/40">
@@ -261,14 +271,13 @@ export default function AdminFornecedoresPage() {
                   <tr>
                     <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500">Fornecedor</th>
                     <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500">Tipo</th>
-                    <th className="px-6 py-4 text-xs font-bold uppercase tracking-wider text-slate-500">Frete Fixo</th>
                     <th className="px-6 py-4 text-right text-xs font-bold uppercase tracking-wider text-slate-500">Ações</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {suppliers.filter(sup => sup.name.toLowerCase().includes(searchQuery.toLowerCase()) || sup.type.toLowerCase().includes(searchQuery.toLowerCase())).length === 0 ? (
                     <tr>
-                      <td colSpan={4} className="px-6 py-8 text-center text-slate-400">
+                      <td colSpan={3} className="px-6 py-8 text-center text-slate-400">
                         Nenhum fornecedor encontrado para "{searchQuery}".
                       </td>
                     </tr>
@@ -276,14 +285,14 @@ export default function AdminFornecedoresPage() {
                     suppliers.filter(sup => sup.name.toLowerCase().includes(searchQuery.toLowerCase()) || sup.type.toLowerCase().includes(searchQuery.toLowerCase())).map((sup) => (
                       editingId === sup.id ? (
                         <tr key={sup.id} className="bg-emerald-50/30">
-                          <td colSpan={4} className="p-4">
+                          <td colSpan={3} className="p-4">
                             <form onSubmit={handleUpdate} className="flex flex-col sm:flex-row gap-4 items-center">
                               <input
                                 type="text"
                                 required
                                 value={editName}
                                 onChange={(e) => setEditName(e.target.value)}
-                                className="w-full sm:w-1/3 rounded-xl border border-slate-200 py-2 px-3 text-sm text-slate-900 focus:border-emerald-500 outline-none"
+                                className="w-full sm:w-1/2 rounded-xl border border-slate-200 py-2 px-3 text-sm text-slate-900 focus:border-emerald-500 outline-none"
                               />
                               <select
                                 required
@@ -294,15 +303,6 @@ export default function AdminFornecedoresPage() {
                                 <option value="Fornecedor Original">Fornecedor Original</option>
                                 <option value="Mercado Local">Mercado Local</option>
                               </select>
-                              <input
-                                type="number"
-                                step="0.01"
-                                min="0"
-                                value={editFreightCost}
-                                onChange={(e) => setEditFreightCost(e.target.value)}
-                                placeholder="Frete Fixo"
-                                className="w-full sm:w-1/4 rounded-xl border border-slate-200 py-2 px-3 text-sm text-slate-900 focus:border-emerald-500 outline-none"
-                              />
                               <div className="flex gap-2 whitespace-nowrap ml-auto">
                                 <button
                                   type="button"
@@ -336,11 +336,6 @@ export default function AdminFornecedoresPage() {
                           }`}>
                             {sup.type}
                           </span>
-                        </td>
-                        <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-bold text-slate-700">
-                            {sup.freight_cost ? new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(sup.freight_cost) : '-'}
-                          </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-right space-x-2">
                           <button

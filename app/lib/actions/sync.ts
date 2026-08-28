@@ -55,9 +55,25 @@ export async function syncBlingProductsAction() {
       return { success: true, message: 'Nenhum produto encontrado no Bling.' };
     }
 
+    const productSuppliersLinks = await BlingService.getAllProductSuppliers();
+    const productSupplierMap = new Map<string, any>(); // bling_product_id -> fornecedor object
+    for (const link of productSuppliersLinks) {
+      if (link.produto?.id && link.fornecedor) {
+        // If we already mapped one, prefer 'padrao' === true, otherwise just keep the first one
+        const existing = productSupplierMap.get(link.produto.id.toString());
+        if (!existing || link.padrao) {
+          productSupplierMap.set(link.produto.id.toString(), link);
+        }
+      }
+    }
+
     const supabase = await createClient();
     let createdCount = 0;
     let updatedCount = 0;
+
+    // Fetch existing suppliers to map fornecedores
+    const { data: suppliersData } = await supabase.from('suppliers').select('id, name, bling_id');
+    const suppliers = suppliersData || [];
 
     // Fetch existing seal families to map category names
     const { data: families } = await supabase.from('seal_families').select('name, bling_id');
@@ -73,7 +89,7 @@ export async function syncBlingProductsAction() {
     let page = 0;
     const pageSize = 1000;
     while (true) {
-      const { data } = await supabase.from('stock_products').select('id, bling_id').not('bling_id', 'is', null).range(page * pageSize, (page + 1) * pageSize - 1);
+      const { data } = await supabase.from('stock_products').select('id, bling_id, measurements, brand').not('bling_id', 'is', null).range(page * pageSize, (page + 1) * pageSize - 1);
       if (!data || data.length === 0) break;
       allExistingData = allExistingData.concat(data);
       if (data.length < pageSize) break;
@@ -81,7 +97,7 @@ export async function syncBlingProductsAction() {
     }
 
     const existingMap = new Map();
-    allExistingData.forEach(e => existingMap.set(e.bling_id.toString(), e.id));
+    allExistingData.forEach(e => existingMap.set(e.bling_id.toString(), { id: e.id, location: e.measurements?.location, brand: e.brand }));
 
     const upsertBatch = [];
 
@@ -89,7 +105,7 @@ export async function syncBlingProductsAction() {
       const blingId = prod.id.toString();
       const name = prod.nome;
       const code = prod.codigo; // SKU in Bling
-      const price = parseFloat(prod.preco || '0');
+      let price = parseFloat(prod.precoCusto || '0');
 
       const measurements = extractMeasurementsFromName(name);
       const partType = extractPartTypeFromName(name);
@@ -102,6 +118,30 @@ export async function syncBlingProductsAction() {
       // Fallback: se for Desconhecida, tenta inferir pelo nome
       if (categoryName === 'Desconhecida') {
         categoryName = extractCategoryFromName(name);
+      }
+
+      // Tenta mapear o fornecedor do Bling e puxar o custo real
+      let supplierId = null;
+      const linkedRecord = productSupplierMap.get(blingId);
+      if (linkedRecord) {
+        if (linkedRecord.precoCusto) {
+          price = parseFloat(linkedRecord.precoCusto);
+        }
+        
+        const blingFornecedorId = linkedRecord.fornecedor?.id;
+        const blingFornecedorNome = linkedRecord.fornecedor?.nome;
+        
+        let match = suppliers.find(s => s.bling_id && s.bling_id === blingFornecedorId);
+        if (!match && blingFornecedorNome) {
+          const bName = blingFornecedorNome.toLowerCase().trim();
+          match = suppliers.find(s => {
+            const sName = s.name.toLowerCase().trim();
+            return bName === sName || bName.includes(sName) || sName.includes(bName);
+          });
+        }
+        if (match) {
+          supplierId = match.id;
+        }
       }
 
       const payload: any = {
@@ -117,12 +157,20 @@ export async function syncBlingProductsAction() {
         parker_code: codes.parker_code || null,
         supplier_code: codes.supplier_code || null,
         brand: brand || null,
+        supplier_id: supplierId,
         updated_at: new Date().toISOString()
       };
 
-      const existingId = existingMap.get(blingId);
-      if (existingId) {
-        payload.id = existingId;
+      const existingData = existingMap.get(blingId);
+      if (existingData) {
+        if (existingData.location) {
+          payload.measurements.location = existingData.location;
+        }
+        // Preserve the existing brand if the extracted brand is suspiciously short or if the existing brand is already good
+        if (existingData.brand && (!payload.brand || payload.brand.length <= 2 || existingData.brand.length > 2)) {
+          payload.brand = existingData.brand;
+        }
+        payload.id = existingData.id;
         updatedCount++;
       } else {
         payload.id = `prod_${Date.now()}_${Math.floor(Math.random() * 1000000)}`;
@@ -291,6 +339,68 @@ export async function syncBlingContactsAction() {
     return { success: true, message: `Clientes sincronizados. ${createdCount} novos, ${updatedCount} atualizados.` };
   } catch (err: any) {
     console.error('syncBlingContactsAction error:', err);
+    return { success: false, error: err.message };
+  }
+}
+
+export async function syncSuppliersFromHardcodedListAction() {
+  try {
+    const supabase = await createClient();
+
+    const suppliersToSync = [
+      { bling_id: 18166979175, type: 'Fornecedor Original', name: 'USINA VEDACOES E ACESSORIOS INDUSTRIAIS LTDA' },
+      { bling_id: 18166979682, type: 'Fornecedor Original', name: 'SP SEALS DISTRIBUIDORA LTDA' },
+      { bling_id: 18166981906, type: 'Fornecedor Original', name: 'RIO PRETO DISTRIBUIDORA DE VEDACOES LTDA' },
+      { bling_id: 18166984492, type: 'Fornecedor Original', name: 'TECVEDACOES COMERCIO DE VEDACOES E ACESSORIOS INDUSTRIAIS LT' },
+      { bling_id: 18166984588, type: 'Mercado Local', name: 'VED PIRA COM.DE VEDACOES HIDRAULICAS E PNEUMATICAS LTDA ME' },
+      { bling_id: 18166984689, type: 'Fornecedor Original', name: 'SKL DISTRIBUIDORA DE VEDACOES INDUSTRIAIS LTDA' },
+      { bling_id: 18180417442, type: 'Mercado Local', name: 'ZOTELLI COM VEDACOES HIDRAULICAS' },
+      { bling_id: 18180417930, type: 'Fornecedor Original', name: 'PARKITS VEDACOES HIDRAULICAS E PNEUMATICAS LTDA' },
+      { bling_id: 18219032503, type: 'Mercado Local', name: 'REAL VEDACOES INDUSTRIA E COMERCIO LTDA' },
+      { bling_id: 18221954746, type: 'Mercado Local', name: 'MFC DISTRIBUIDORA HIDRAULICA LTDA' },
+      { bling_id: 18240304442, type: 'Fornecedor Original', name: 'SIPPEL SUPRIMENTOS E ACESSORIOS IND LTDA' },
+      { bling_id: 18268385717, type: 'Fornecedor Original', name: 'LIBEL COMERCIO DE COMPONENTES DE VEDACAO LTDA.' },
+      { bling_id: 18278746092, type: 'Fornecedor Original', name: 'SKS USINAGEM E VEDACOES HIDRAULICA LTDA' },
+      { bling_id: 18278941418, type: 'Fornecedor Original', name: 'NORD RETENTORES LTDA' },
+      { bling_id: 18287198560, type: 'Fornecedor Original', name: 'CENTER SEALS- COMERCIO DE VEDACOES LTDA' },
+      { bling_id: 18287198687, type: 'Fornecedor Original', name: 'Comercio de Polimeros Industriais do Brasil Copolbra Ltda' },
+      { bling_id: 18309603230, type: 'Fornecedor Original', name: 'PK2 VEDACOES COMERCIO DE BORRACHAS E PLASTICOS LTDA' },
+    ];
+
+    let createdCount = 0;
+    let updatedCount = 0;
+
+    for (const sup of suppliersToSync) {
+      // Buscar o fornecedor atualizado direto do Bling
+      const contactFromBling = await BlingService.getContact(sup.bling_id.toString());
+      
+      if (contactFromBling && contactFromBling.nome) {
+        const supplierName = contactFromBling.nome;
+        
+        // Tenta achar pelo bling_id no banco
+        const { data: existing } = await supabase.from('suppliers').select('id').eq('bling_id', sup.bling_id).single();
+        
+        if (existing) {
+          const { error } = await supabase.from('suppliers').update({ name: supplierName, type: sup.type }).eq('id', existing.id);
+          if (!error) updatedCount++;
+        } else {
+          // Se não tiver pelo bling_id, cria um novo
+          const payload = {
+            id: `sup_${Date.now()}_${Math.floor(Math.random() * 10000)}`,
+            name: supplierName,
+            type: sup.type,
+            bling_id: sup.bling_id,
+            created_at: new Date().toISOString()
+          };
+          const { error } = await supabase.from('suppliers').insert([payload]);
+          if (!error) createdCount++;
+        }
+      }
+    }
+
+    return { success: true, message: `Fornecedores base sincronizados: ${createdCount} criados, ${updatedCount} atualizados.` };
+  } catch (err: any) {
+    console.error('syncSuppliersFromHardcodedListAction error:', err);
     return { success: false, error: err.message };
   }
 }

@@ -10,6 +10,8 @@ export function createProtocol(initial: Partial<Protocol>): Protocol {
     updatedAt: new Date().toISOString(),
     items: initial.items ?? [],
     totals: initial.totals ?? { subtotal: 0, markup: 0, total: 0 },
+    draftForm: initial.draftForm,
+    supplierFreights: initial.supplierFreights,
   } as Protocol;
 }
 

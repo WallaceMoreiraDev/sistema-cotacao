@@ -59,11 +59,31 @@ export async function enviarParaBlingAction(protocolId: string | number): Promis
             tipo: 'P',
             formato: 'S',
             preco: item.sale_price || item.unit_price,
-            situacao: 'A'
+            situacao: 'A',
+            marca: item.brand || '',
+            unidade: 'UN'
           });
           blingProductId = newProd.id;
           
-          // Optionally, we could save this back to stock_products so it's linked forever.
+          let bestSupplierId = item.forced_supplier_id;
+          let bestCost = item.unit_price || 0;
+
+          if (!bestSupplierId && item.supplier_costs) {
+            let minCost = Infinity;
+            for (const [supId, cost] of Object.entries(item.supplier_costs)) {
+              if (typeof cost === 'number' && cost < minCost) {
+                minCost = cost;
+                bestSupplierId = supId;
+              }
+            }
+          }
+
+          if (bestSupplierId) {
+            const { data: supData } = await supabase.from('suppliers').select('bling_id').eq('id', bestSupplierId).single();
+            if (supData && supData.bling_id) {
+              await BlingService.addSupplierToProduct(blingProductId, supData.bling_id, bestCost);
+            }
+          }
         } catch (prodErr) {
           console.error('Erro ao criar produto no Bling:', prodErr);
           throw new Error(`Falha ao criar o produto "${item.name}" no Bling.`);
