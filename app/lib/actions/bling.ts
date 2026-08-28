@@ -62,11 +62,11 @@ export async function enviarParaBlingAction(protocolId: string | number): Promis
             situacao: 'A',
             marca: item.brand || '',
             unidade: 'UN',
-            tipoItem: '00',
             tributacao: {
               origem: 0,
               ncm: '4016.93.00',
-              cest: '01.007.00'
+              cest: '01.007.00',
+              spedTipoItem: '00'
             }
           });
           blingProductId = newProd.id;
