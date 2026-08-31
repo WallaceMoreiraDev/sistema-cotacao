@@ -3,6 +3,7 @@
 import { createClient } from '../supabase/server';
 import { BlingService } from '../services/blingService';
 import { insertLogAction } from './logs';
+import { insertSystemErrorAction } from './systemErrors';
 
 /**
  * Enviar para Bling Action
@@ -90,9 +91,27 @@ export async function enviarParaBlingAction(protocolId: string | number): Promis
               await BlingService.addSupplierToProduct(blingProductId, supData.bling_id, bestCost);
             }
           }
-        } catch (prodErr) {
+        } catch (prodErr: any) {
           console.error('Erro ao criar produto no Bling:', prodErr);
-          throw new Error(`Falha ao criar o produto "${item.name}" no Bling.`);
+          
+          let blingErrorMsg = 'Erro desconhecido ao criar produto no Bling.';
+          if (prodErr.response?.data?.error?.message) {
+            blingErrorMsg = prodErr.response.data.error.message;
+          } else if (prodErr.response?.data?.error?.fields) {
+            blingErrorMsg = JSON.stringify(prodErr.response.data.error.fields);
+          } else if (prodErr.message) {
+            blingErrorMsg = prodErr.message;
+          }
+
+          // Salva log administrativo de erro
+          await insertSystemErrorAction({
+            error_type: 'bling_api_product',
+            message: `Falha ao criar o produto "${item.name}" no Bling: ${blingErrorMsg}`,
+            details: prodErr.response?.data || prodErr,
+            protocol_id: protocolId
+          });
+
+          throw new Error(`Item "${item.name}": ${blingErrorMsg}`);
         }
       }
 
@@ -110,7 +129,29 @@ export async function enviarParaBlingAction(protocolId: string | number): Promis
       itens: blingItems
     };
 
-    await BlingService.createPropostaComercial(propostaData);
+    try {
+      await BlingService.createPropostaComercial(propostaData);
+    } catch (propErr: any) {
+      console.error('Erro ao criar proposta comercial no Bling:', propErr);
+      
+      let blingErrorMsg = 'Erro desconhecido ao criar proposta no Bling.';
+      if (propErr.response?.data?.error?.message) {
+        blingErrorMsg = propErr.response.data.error.message;
+      } else if (propErr.response?.data?.error?.fields) {
+        blingErrorMsg = JSON.stringify(propErr.response.data.error.fields);
+      } else if (propErr.message) {
+        blingErrorMsg = propErr.message;
+      }
+
+      await insertSystemErrorAction({
+        error_type: 'bling_api_proposal',
+        message: `Falha ao criar proposta comercial: ${blingErrorMsg}`,
+        details: propErr.response?.data || propErr,
+        protocol_id: protocolId
+      });
+
+      throw new Error(`Proposta Comercial: ${blingErrorMsg}`);
+    }
     
     // Update status in our DB
     const { error: updateErr } = await supabase

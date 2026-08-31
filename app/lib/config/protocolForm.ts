@@ -20,6 +20,7 @@ export interface ItemFormState {
   brand: string;
   quantity: string;
   description: string; // Descrição Gerada Manualmente ou Auto
+  observation: string; // Observação livre
   ignoreStock: boolean;
   measurements: Record<MeasurementKey, string>;
   // Mantendo para compatibilidade antiga temporariamente ou removendo
@@ -35,6 +36,7 @@ export const EMPTY_ITEM_FORM: ItemFormState = {
   brand: '',
   quantity: '',
   description: '',
+  observation: '',
   ignoreStock: false,
   measurements: {
     innerDiameter: '',

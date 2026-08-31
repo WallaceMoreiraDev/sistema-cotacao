@@ -340,6 +340,7 @@ export function useProtocolState(
       code: fmCode || undefined,
       brand: itemForm.brand || undefined,
       part_type: itemForm.partType || undefined,
+      category: itemForm.category || undefined,
       parker_code: itemForm.parkerCode || undefined,
       description: itemForm.description || undefined,
       measurements,
@@ -395,6 +396,21 @@ export function useProtocolState(
       );
     }
   }, [aCotarItems]);
+
+  const handleUpdateItem = useCallback((itemId: string, updatedFields: Partial<ProtocolItem>) => {
+    setACotarItems(prev => prev.map(item => {
+      if (item.id === itemId) {
+        return { ...item, ...updatedFields };
+      }
+      return item;
+    }));
+    setEstoqueItems(prev => prev.map(item => {
+      if (item.id === itemId) {
+        return { ...item, ...updatedFields };
+      }
+      return item;
+    }));
+  }, []);
 
   const removeEstoqueItem = useCallback((id: string) => {
     setEstoqueItems(prev => prev.filter(i => i.id !== id));
@@ -941,10 +957,12 @@ export function useProtocolState(
     itemForm,
     setItemForm,
     addFeedback,
-    getFreeStock,
+    clearItemForm,
     handleAddItem,
     handleAddStockItem,
     handleCreateNewItem,
+    handleUpdateItem,
+    getFreeStock,
     handleReallocate,
     removeEstoqueItem,
     updateEstoqueItemQuantity,
@@ -958,6 +976,5 @@ export function useProtocolState(
     updateItemMarkup,
     updateItemField,
     updateMeasurement,
-    clearItemForm,
   };
 }

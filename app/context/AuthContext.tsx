@@ -57,7 +57,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       setUser({
         id: session.user.id,
         name: profile?.full_name || session.user.email || 'Usuário',
-        role: profile?.role || (session.user.email?.includes('wallace') ? 'admin' : 'funcionario'),
+        role: profile?.role?.toLowerCase() || (session.user.email?.includes('wallace') ? 'admin' : 'funcionario'),
         jobTitle: profile?.job_title,
         department: profile?.department,
         status: profile?.status || 'ativo',

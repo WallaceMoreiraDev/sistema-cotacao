@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react';
 import { getProtocolByIdAction } from '../../../lib/actions/protocols';
 import { calculateTotals } from '../../../lib/services/protocolService';
 import { countUniqueProtocolItems } from '../../../lib/utils/protocolFormatters';
-import type { Protocol } from '../../../lib/types/database';
+import type { Protocol, ProtocolItem } from '../../../lib/types/database';
 import { ItemFormState } from '../../../lib/config/protocolForm';
 import { useProtocolRealtime } from '../../../lib/hooks/useProtocolRealtime';
 import { useProtocolPage } from '../../../lib/hooks/useProtocolPage';
@@ -21,6 +21,7 @@ import { ModalDeficitEstoque } from '../components/ModalDeficitEstoque';
 import { ModalCancelar } from '../components/ModalCancelar';
 import { FooterAcoes } from '../components/FooterAcoes';
 import GestaoFretes from '../components/GestaoFretes';
+import { ModalEditarItem } from '../components/ModalEditarItem';
 
 export default function ProtocolDetailPage() {
   const params = useParams<{ id: string }>();
@@ -31,6 +32,7 @@ export default function ProtocolDetailPage() {
   );
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [sealFamilies, setSealFamilies] = useState<any[]>([]);
+  const [editingItem, setEditingItem] = useState<ProtocolItem | null>(null);
   useEffect(() => {
     import('../../../lib/actions/suppliers').then(m => {
       m.getSuppliersAction().then(res => { if (res.success && res.data) setSuppliers(res.data); });
@@ -49,7 +51,7 @@ export default function ProtocolDetailPage() {
     removeEstoqueItem, updateEstoqueItemQuantity,
     removeACotarItem, updateACotarItemQuantity, updateSupplierCost,
     forceItemSupplier, toggleExcludeFromPurchasing, updateItemMarkup, updateItemField, updateMeasurement, clearItemForm,
-    handleCreateNewItem, allItems,
+    handleCreateNewItem, handleUpdateItem, allItems,
     isFormUnlocked, isItemFormValid, canFinalize, canSendToBling,
     handleCancelar, confirmCancelar, handleRestaurar, handleEstornar,
     triggerSaveCheck,
@@ -157,7 +159,8 @@ export default function ProtocolDetailPage() {
         stockProducts={stockProducts}
         handleReallocate={(id, qty) => handleReallocate(id, qty, stockProducts)}
         getFreeStock={identifier => getFreeStock(identifier, stockProducts)} isViewing={isViewing}
-        protocolId={protocolIdRef.current} />
+        protocolId={protocolIdRef.current} 
+        onEditItem={setEditingItem} />
         
       <GestaoFretes
         aCotarItems={aCotarItems}
@@ -185,6 +188,13 @@ export default function ProtocolDetailPage() {
         onConfirm={handleConfirmDeficit} onClose={() => setShowDeficitModal(false)} isLoading={isFinalizing} />
       <ModalCancelar isOpen={showCancelModal} onClose={() => setShowCancelModal(false)}
         onConfirm={confirmCancelar} isLoading={isFinalizing} />
+      <ModalEditarItem 
+        isOpen={!!editingItem} 
+        onClose={() => setEditingItem(null)} 
+        item={editingItem} 
+        onSave={handleUpdateItem} 
+        sealFamilies={sealFamilies} 
+      />
     </section>
   );
 }

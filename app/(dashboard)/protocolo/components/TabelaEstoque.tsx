@@ -72,6 +72,11 @@ export function TabelaEstoque({ items, updateQuantity, removeItem, getFreeStock,
                             )}
                           </div>
                         )}
+                        {item.observation && (
+                          <div className="text-[11px] text-slate-600 bg-slate-50 p-1.5 rounded border border-slate-200 mt-1.5 italic shadow-sm w-fit">
+                            <span className="font-semibold not-italic text-slate-700">Obs:</span> {item.observation}
+                          </div>
+                        )}
                       </div>
                     </td>
                     <td className="px-4 py-3 text-slate-500">{item.code || '-'}</td>

@@ -21,6 +21,8 @@ function mapRowToProtocolItem(row: any): ProtocolItem {
     nickname: row.nickname || undefined,
     code: row.code || undefined,
     brand: row.brand || undefined,
+    part_type: row.measurements?.part_type || undefined,
+    category: row.measurements?.category || undefined,
     measurements: row.measurements || {},
     supplierId: row.supplier_id || undefined,
     markupPercent: row.markup_percent !== null && row.markup_percent !== undefined ? Number(row.markup_percent) : undefined,
@@ -30,6 +32,7 @@ function mapRowToProtocolItem(row: any): ProtocolItem {
     supplierCosts: row.supplier_costs || {},
     productId: row.product_id || undefined,
     excludeFromPurchasing: row.measurements?.excludeFromPurchasing === true,
+    observation: row.observation || undefined,
   };
 }
 
@@ -157,7 +160,7 @@ export async function saveProtocolAction(protocol: Protocol, options?: { skipDif
     const { data: { user } } = await supabase.auth.getUser();
     if (user) {
       const { data: profile } = await supabase.from('profiles').select('role').eq('id', user.id).single();
-      if (profile && profile.role === 'admin') {
+      if (profile && profile.role?.toLowerCase() === 'admin') {
         isAdmin = true;
       }
     }
@@ -329,6 +332,8 @@ export async function saveProtocolAction(protocol: Protocol, options?: { skipDif
           measurements: {
             ...(item.measurements || {}),
             excludeFromPurchasing: item.excludeFromPurchasing,
+            part_type: item.part_type,
+            category: item.category,
           },
           supplier_id: item.supplierId,
           markup_percent: finalMarkup,
@@ -337,6 +342,7 @@ export async function saveProtocolAction(protocol: Protocol, options?: { skipDif
           approval_status: finalApprovalStatus,
           supplier_costs: item.supplierCosts || {},
           product_id: item.productId || null,
+          observation: item.observation || null,
         };
       });
 

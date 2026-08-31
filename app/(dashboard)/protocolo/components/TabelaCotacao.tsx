@@ -21,6 +21,7 @@ interface TabelaCotacaoProps {
   isViewing?: boolean;
   protocolId?: string | number;
   stockProducts?: StockProduct[];
+  onEditItem?: (item: ProtocolItem) => void;
 }
 
 export function TabelaCotacao({
@@ -39,6 +40,7 @@ export function TabelaCotacao({
   isViewing = false,
   protocolId,
   stockProducts = [],
+  onEditItem,
 }: TabelaCotacaoProps) {
   const isAdmin = userRole === 'admin';
   const [unlockedItems, setUnlockedItems] = useState<Set<string>>(new Set());
@@ -142,8 +144,24 @@ export function TabelaCotacao({
                         {isPurchased && <span className="px-1.5 py-0.5 rounded bg-emerald-100 text-emerald-700 text-[10px] font-bold border border-emerald-200">✅ COMPRADO</span>}
                         {item.brand && <span className="px-1.5 py-0.5 rounded bg-slate-200/70 text-slate-600 text-[10px]">Marca: {item.brand}</span>}
                         {item.oem && <span className="px-1.5 py-0.5 rounded bg-slate-200/70 text-slate-600 text-[10px]">OEM: {item.oem}</span>}
+                        {!item.productId && onEditItem && !isViewing && (
+                          <button
+                            onClick={() => onEditItem(item)}
+                            className="p-1 text-slate-400 hover:text-brand transition-colors rounded hover:bg-slate-100"
+                            title="Editar Item"
+                          >
+                            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                            </svg>
+                          </button>
+                        )}
                       </div>
                       {item.code && <div className="text-xs text-slate-500 mt-0.5 font-medium">Cód: {item.code}</div>}
+                      {item.observation && (
+                        <div className="text-[11px] text-slate-600 bg-slate-50 p-1.5 rounded border border-slate-200 mt-1.5 italic shadow-sm w-fit">
+                          <span className="font-semibold not-italic text-slate-700">Obs:</span> {item.observation}
+                        </div>
+                      )}
                     </div>
                   </div>
 

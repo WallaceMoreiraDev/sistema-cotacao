@@ -18,6 +18,7 @@ import { ModalDivisaoEstoque } from '../components/ModalDivisaoEstoque';
 import { ModalDeficitEstoque } from '../components/ModalDeficitEstoque';
 import { ModalCancelar } from '../components/ModalCancelar';
 import { FooterAcoes } from '../components/FooterAcoes';
+import { ModalEditarItem } from '../components/ModalEditarItem';
 
 export default function NewProtocolPage() {
   const { user } = useAuth();
@@ -25,6 +26,7 @@ export default function NewProtocolPage() {
 
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [sealFamilies, setSealFamilies] = useState<any[]>([]);
+  const [editingItem, setEditingItem] = useState<any>(null);
 
   useEffect(() => {
     import('../../../lib/actions/suppliers').then(m => {
@@ -43,7 +45,7 @@ export default function NewProtocolPage() {
     removeEstoqueItem, updateEstoqueItemQuantity, splitEstoqueItem,
     removeACotarItem, updateACotarItemQuantity, updateSupplierCost,
     forceItemSupplier, toggleExcludeFromPurchasing, updateItemMarkup, updateItemField, updateMeasurement, clearItemForm,
-    handleCreateNewItem, allItems,
+    handleCreateNewItem, handleUpdateItem, allItems,
     isFormUnlocked, isItemFormValid, canFinalize,
     triggerSaveCheck, handleCancelar, confirmCancelar,
     showCancelModal, setShowCancelModal,
@@ -110,6 +112,7 @@ export default function NewProtocolPage() {
         handleReallocate={(id, qty) => handleReallocate(id, qty, stockProducts)}
         getFreeStock={identifier => getFreeStock(identifier, stockProducts)}
         protocolId={protocolIdRef.current}
+        onEditItem={setEditingItem}
       />
 
       <FooterAcoes
@@ -137,6 +140,14 @@ export default function NewProtocolPage() {
 
       <ModalCancelar isOpen={showCancelModal} onClose={() => setShowCancelModal(false)}
         onConfirm={confirmCancelar} isLoading={isFinalizing} />
+
+      <ModalEditarItem 
+        isOpen={!!editingItem} 
+        onClose={() => setEditingItem(null)} 
+        item={editingItem} 
+        onSave={handleUpdateItem} 
+        sealFamilies={sealFamilies} 
+      />
     </section>
   );
 }

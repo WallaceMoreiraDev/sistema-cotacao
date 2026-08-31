@@ -56,8 +56,10 @@ export interface ProtocolItem {
   code?: string; // código da vedação (SKU FM)
   brand?: string;
   part_type?: string;
+  category?: string;
   parker_code?: string;
   description?: string; // Nome inteligente gerado
+  observation?: string; // Observação livre por item
   measurements?: {
     location?: string;
     innerDiameter?: number;

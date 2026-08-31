@@ -1,5 +1,6 @@
 import { createClient } from '../../../lib/supabase/server';
 import { redirect } from 'next/navigation';
+import { AdminLogsTabs } from './components/AdminLogsTabs';
 
 export default async function AdminLogsPage() {
   const supabase = await createClient();
@@ -48,6 +49,8 @@ export default async function AdminLogsPage() {
 
   return (
     <div className="flex flex-col gap-6">
+      <AdminLogsTabs />
+      
       <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-6 rounded-3xl bg-slate-900 p-8 shadow-xl relative overflow-hidden">
         {/* Background Decorations */}
         <div className="absolute -right-20 -top-20 h-64 w-64 rounded-full bg-slate-800/50 blur-3xl" />
