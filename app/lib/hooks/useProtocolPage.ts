@@ -136,7 +136,7 @@ export function useProtocolPage({
   }, [allItems, clientName, protocolTitle, itemForm, isViewing, isFinalizing, protocolStatus, queueSaveProtocol, supplierFreights]);
 
   const handleSaveDraft = useCallback(async (
-    forcedEstoque?: ProtocolItem[], forcedACotar?: ProtocolItem[], options?: { skipDiffLog?: boolean }
+    forcedEstoque?: ProtocolItem[], forcedACotar?: ProtocolItem[], options?: { skipDiffLog?: boolean, silent?: boolean }
   ) => {
     if (!canFinalize) return;
     setIsFinalizing(true); isFinalizingRef.current = true;
@@ -152,7 +152,9 @@ export function useProtocolPage({
         status: protocolStatus, draftForm: itemForm,
         supplierFreights,
       }), options);
-      toast.success('Rascunho salvo com sucesso!');
+      if (!options?.silent) {
+        toast.success('Rascunho salvo com sucesso!');
+      }
       if (navigateAfterSave) router.push(`/protocolo/${protocolIdRef.current}`);
       else setIsViewing(true);
     } catch (e) { console.error(e); toast.error('Erro ao salvar rascunho.'); }
@@ -192,11 +194,14 @@ export function useProtocolPage({
     forcedEstoque?: ProtocolItem[], forcedACotar?: ProtocolItem[], options?: { skipDiffLog?: boolean }
   ) => {
     setIsFinalizing(true);
+    const toastId = toast.loading('Enviando para o Bling... (Isso pode demorar alguns segundos)', { duration: 30000 });
     try {
-      await handleSaveDraft(forcedEstoque, forcedACotar, options);
+      await handleSaveDraft(forcedEstoque, forcedACotar, { ...options, silent: true });
       const res = await enviarParaBlingAction(protocolIdRef.current);
-      if (res.success) { toast.success('Enviado para o Bling com sucesso!'); setProtocolStatus('finalizado'); setIsViewing(true); }
-      else toast.error(res.error || 'Erro ao enviar para o Bling');
+      if (res.success) { toast.success('Enviado para o Bling com sucesso!', { id: toastId }); setProtocolStatus('finalizado'); setIsViewing(true); }
+      else toast.error(res.error || 'Erro ao enviar para o Bling', { id: toastId });
+    } catch (err: any) {
+      toast.error('Erro ao enviar para o Bling.', { id: toastId });
     } finally { setIsFinalizing(false); }
   }, [handleSaveDraft]);
 

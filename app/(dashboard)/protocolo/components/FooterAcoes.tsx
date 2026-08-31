@@ -126,7 +126,7 @@ export function FooterAcoes({
                     disabled={isLoading || !canSendToBling}
                     className="inline-flex items-center gap-2 rounded-xl bg-[#F7C00C] px-5 py-2.5 text-xs font-bold text-slate-900 shadow-sm transition-all hover:bg-[#E8B600] disabled:opacity-40"
                   >
-                    Enviar para Bling
+                    {isLoading ? 'Enviando...' : 'Enviar para Bling'}
                   </button>
                   {!canSendToBling && (
                     <div className="absolute bottom-full right-0 mb-2 hidden group-hover:block z-20 w-56">
