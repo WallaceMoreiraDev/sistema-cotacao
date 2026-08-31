@@ -41,6 +41,11 @@ export async function enviarParaBlingAction(protocolId: string | number): Promis
     const blingItems = [];
 
     for (const item of items) {
+      // Wait 400ms between items to prevent Rate Limit (429 TOO_MANY_REQUESTS) - Bling allows max 3 req/sec
+      if (blingItems.length > 0) {
+        await new Promise(resolve => setTimeout(resolve, 400));
+      }
+
       // Get the product bling_id. If it's a stock item, it should have it in stock_products.
       let blingProductId = null;
 
@@ -50,6 +55,10 @@ export async function enviarParaBlingAction(protocolId: string | number): Promis
         if (stockProd && stockProd.bling_id) {
           blingProductId = stockProd.bling_id;
         }
+      }
+
+      if (!blingProductId && item.measurements?.bling_id) {
+        blingProductId = item.measurements.bling_id;
       }
 
       // If still no blingProductId (e.g. custom item "A Cotar"), we must create it in Bling!
@@ -72,6 +81,11 @@ export async function enviarParaBlingAction(protocolId: string | number): Promis
           });
           blingProductId = newProd.id;
           
+          // Save the new bling_id into the database to prevent duplication if a later item fails
+          await supabase.from('protocol_items').update({ 
+            measurements: { ...(item.measurements || {}), bling_id: newProd.id } 
+          }).eq('id', item.id);
+          
           let bestSupplierId = item.forced_supplier_id;
           let bestCost = item.unit_price || 0;
 
@@ -88,6 +102,7 @@ export async function enviarParaBlingAction(protocolId: string | number): Promis
           if (bestSupplierId) {
             const { data: supData } = await supabase.from('suppliers').select('bling_id').eq('id', bestSupplierId).single();
             if (supData && supData.bling_id) {
+              await new Promise(resolve => setTimeout(resolve, 400));
               await BlingService.addSupplierToProduct(blingProductId, supData.bling_id, bestCost);
             }
           }
