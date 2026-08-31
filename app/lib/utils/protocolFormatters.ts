@@ -28,20 +28,33 @@ export function areItemsMatching(
   itemA: { name?: string; code?: string; productId?: string; brand?: string; measurements?: any },
   itemB: { name?: string; code?: string; productId?: string; brand?: string; measurements?: any }
 ): boolean {
+  // 1. Match exato por productId
   if (itemA.productId && itemB.productId && String(itemA.productId) === String(itemB.productId)) {
     return true;
   }
+
+  // 2. Nome é obrigatório e deve bater
   if (String(itemA.name || '').trim().toLowerCase() !== String(itemB.name || '').trim().toLowerCase()) {
     return false;
   }
+
+  // 3. Código só bloqueia se AMBOS têm código e diferem
   if (itemA.code && itemB.code && String(itemA.code).trim().toLowerCase() !== String(itemB.code).trim().toLowerCase()) {
     return false;
   }
-  if (String(itemA.brand || '').trim().toLowerCase() !== String(itemB.brand || '').trim().toLowerCase()) {
+
+  // 4. Marca só bloqueia se AMBOS têm marca e diferem (um sem marca não bloqueia o match)
+  const brandA = String(itemA.brand || '').trim().toLowerCase();
+  const brandB = String(itemB.brand || '').trim().toLowerCase();
+  if (brandA && brandB && brandA !== brandB) {
     return false;
   }
+
+  // 5. Medidas — aceita tanto "cs" quanto "crossSection" no campo de seção transversal
   const mA = itemA.measurements || {};
   const mB = itemB.measurements || {};
+  const csA = mA.cs ?? mA.crossSection ?? undefined;
+  const csB = mB.cs ?? mB.crossSection ?? undefined;
 
   return (
     (mA.innerDiameter ?? undefined) === (mB.innerDiameter ?? undefined) &&
@@ -49,9 +62,10 @@ export function areItemsMatching(
     (mA.height1 ?? undefined) === (mB.height1 ?? undefined) &&
     (mA.height2 ?? undefined) === (mB.height2 ?? undefined) &&
     (mA.thickness ?? undefined) === (mB.thickness ?? undefined) &&
-    (mA.crossSection ?? undefined) === (mB.crossSection ?? undefined)
+    csA === csB
   );
 }
+
 
 export function countUniqueProtocolItems(items: { name?: string; code?: string; productId?: string; brand?: string; measurements?: any }[] | undefined): number {
   if (!items || !Array.isArray(items) || items.length === 0) return 0;
