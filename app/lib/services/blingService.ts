@@ -1,6 +1,6 @@
 import { getSystemSettingsAction, updateSystemSettingsAction } from '../actions/admin';
 
-const BLING_API_BASE = 'https://www.bling.com.br/Api/v3';
+const BLING_API_BASE = 'https://api.bling.com.br/Api/v3';
 
 export class BlingService {
   private static async getSettings() {
@@ -58,7 +58,7 @@ export class BlingService {
     }
 
     const data = await response.json();
-    
+
     // Save tokens to DB
     const expiresAt = new Date(Date.now() + (data.expires_in * 1000)).toISOString();
     await updateSystemSettingsAction({
@@ -76,7 +76,7 @@ export class BlingService {
    */
   static async refreshTokenIfNeeded() {
     let settings = await this.getSettings();
-    
+
     if (!settings.bling_access_token || !settings.bling_refresh_token || !settings.bling_token_expires_at) {
       throw new Error('O Bling não está autenticado. É necessário realizar a conexão OAuth primeiro.');
     }
@@ -89,7 +89,7 @@ export class BlingService {
     if (now > expiresAt - buffer) {
       console.log('Bling token expirarado ou prestes a expirar. Atualizando...');
       const credentials = Buffer.from(`${settings.bling_client_id}:${settings.bling_client_secret}`).toString('base64');
-      
+
       const params = new URLSearchParams();
       params.append('grant_type', 'refresh_token');
       params.append('refresh_token', settings.bling_refresh_token);
@@ -110,7 +110,7 @@ export class BlingService {
 
       const data = await response.json();
       const newExpiresAt = new Date(Date.now() + (data.expires_in * 1000)).toISOString();
-      
+
       await updateSystemSettingsAction({
         ...settings,
         bling_access_token: data.access_token,
@@ -129,9 +129,9 @@ export class BlingService {
    */
   static async request(endpoint: string, options: RequestInit = {}) {
     const token = await this.refreshTokenIfNeeded();
-    
+
     const url = endpoint.startsWith('http') ? endpoint : `${BLING_API_BASE}${endpoint}`;
-    
+
     const response = await fetch(url, {
       ...options,
       headers: {
@@ -163,7 +163,7 @@ export class BlingService {
       }
       const result = await response.json();
       const data = result.data || [];
-      
+
       allCategories = allCategories.concat(data);
 
       if (data.length < 100) {
@@ -194,7 +194,7 @@ export class BlingService {
       }
       const result = await response.json();
       const data = result.data || [];
-      
+
       allProducts = allProducts.concat(data);
 
       if (data.length < 100) {
@@ -225,7 +225,7 @@ export class BlingService {
       }
       const result = await response.json();
       const data = result.data || [];
-      
+
       allLinks = allLinks.concat(data);
 
       if (data.length < 100) {
@@ -287,11 +287,11 @@ export class BlingService {
    */
   static async getStockBalancesForProducts(productIds: string[]) {
     if (!productIds || productIds.length === 0) return [];
-    
+
     // Bling requires IDs passed as query array: idsProdutos[]=1&idsProdutos[]=2...
     const urlParams = new URLSearchParams();
     productIds.forEach(id => urlParams.append('idsProdutos[]', id));
-    
+
     const response = await this.request(`/estoques/saldos?${urlParams.toString()}`);
     if (!response.ok) {
       const errText = await response.text();
@@ -329,7 +329,7 @@ export class BlingService {
       }
       const result = await response.json();
       const data = result.data || [];
-      
+
       allContacts = allContacts.concat(data);
 
       if (data.length < 100) {
@@ -351,12 +351,12 @@ export class BlingService {
       method: 'POST',
       body: JSON.stringify(productData)
     });
-    
+
     if (!response.ok) {
       const errText = await response.text();
       throw new Error(`Falha ao criar produto no Bling: ${response.status} - ${errText}`);
     }
-    
+
     const result = await response.json();
     return result.data;
   }
@@ -371,7 +371,7 @@ export class BlingService {
       precoCusto: precoCusto,
       padrao: true
     };
-    
+
     const response = await this.request('/produtos/fornecedores', {
       method: 'POST',
       body: JSON.stringify(payload)
