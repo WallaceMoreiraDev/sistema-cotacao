@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { createProtocol, calculateTotals } from '../services/protocolService';
 import { areItemsMatching } from '../utils/protocolFormatters';
+import { getPriceTableItemsAction } from '../actions/priceTables';
 import {
   saveProtocolAction,
   reservarEstoqueAction,
@@ -13,7 +14,7 @@ import {
   restaurarCotacaoAction,
 } from '../actions/protocols';
 import { useProtocolState } from './useProtocolState';
-import type { Protocol, ProtocolItem, StockProduct } from '../types/database';
+import type { Protocol, ProtocolItem, StockProduct, PriceTableItem } from '../types/database';
 import toast from 'react-hot-toast';
 
 const AUTOSAVE_DELAY = 1500;
@@ -22,6 +23,7 @@ interface UseProtocolPageOptions {
   protocolId?: string | number;
   initialStatus?: Protocol['status'];
   initialViewing?: boolean;
+  initialPriceTableId?: string;
   registeredClients: Array<{ name: string }>;
   stockProducts: StockProduct[];
   suppliers: any[];
@@ -33,6 +35,7 @@ export function useProtocolPage({
   protocolId: initialProtocolId,
   initialStatus = 'nao_reservado',
   initialViewing = false,
+  initialPriceTableId,
   registeredClients,
   stockProducts,
   suppliers,
@@ -43,12 +46,33 @@ export function useProtocolPage({
 
   const [clientName, setClientName] = useState('');
   const [protocolTitle, setProtocolTitle] = useState('');
+  const [priceTableId, setPriceTableId] = useState<string>(initialPriceTableId || '');
   const [protocolStatus, setProtocolStatus] = useState<Protocol['status']>(initialStatus);
   const [isViewing, setIsViewing] = useState(initialViewing);
   const [isFinalizing, setIsFinalizing] = useState(false);
   const isFinalizingRef = useRef(false);
   const [showCancelModal, setShowCancelModal] = useState(false);
   const [autoSaveStatus, setAutoSaveStatus] = useState<'idle' | 'saving' | 'saved'>('idle');
+  const [priceTableItems, setPriceTableItems] = useState<PriceTableItem[]>([]);
+
+  useEffect(() => {
+    let active = true;
+    if (priceTableId) {
+      // Clear items immediately so old table prices don't linger while fetching
+      setPriceTableItems([]);
+      getPriceTableItemsAction(priceTableId).then(res => {
+        if (!active) return;
+        if (res.success && res.data) {
+          setPriceTableItems(res.data);
+        } else {
+          setPriceTableItems([]);
+        }
+      });
+    } else {
+      setPriceTableItems([]);
+    }
+    return () => { active = false; };
+  }, [priceTableId]);
 
   const protocolIdRef = useRef<string | number>(initialProtocolId ?? `proto-${Date.now()}`);
   const autoSaveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -64,7 +88,10 @@ export function useProtocolPage({
     updateSupplierCost, forceItemSupplier, toggleExcludeFromPurchasing, updateItemMarkup, updateItemField, updateMeasurement,
     clearItemForm, handleCreateNewItem, handleUpdateItem,
     supplierFreights, setSupplierFreights, updateSupplierFreight
-  } = useProtocolState([], [], suppliers, userRole);
+  } = useProtocolState([], [], suppliers, userRole, {}, priceTableItems);
+
+  // Sync priceTableId to useProtocolState if needed later, but we can pass it to useProtocolState or fetch prices here.
+  // We'll pass priceTableId out of this hook so the page can fetch items and update useProtocolState.
 
   const allItems = useMemo(() => [...estoqueItems, ...aCotarItems], [estoqueItems, aCotarItems]);
 
@@ -109,7 +136,7 @@ export function useProtocolPage({
 
   useEffect(() => {
     if (!isViewing) isDirtyRef.current = true;
-  }, [allItems, clientName, protocolTitle, itemForm, isViewing, supplierFreights]);
+  }, [allItems, clientName, protocolTitle, itemForm, isViewing, supplierFreights, priceTableId]);
 
   useEffect(() => {
     if (isViewing || isFinalizing || isFinalizingRef.current) return;
@@ -126,6 +153,7 @@ export function useProtocolPage({
         totals: { subtotal: totalsObj.subtotal, markup: totalsObj.markup, total: totalsObj.total },
         status: protocolStatus, draftForm: itemForm,
         supplierFreights,
+        priceTableId: priceTableId || undefined,
       });
       const res = await queueSaveProtocol(protocol);
       if (res.success && res.data) protocolIdRef.current = res.data.id;
@@ -133,7 +161,7 @@ export function useProtocolPage({
       setTimeout(() => setAutoSaveStatus('idle'), 2000);
     }, AUTOSAVE_DELAY);
     return () => { if (autoSaveTimer.current) clearTimeout(autoSaveTimer.current); };
-  }, [allItems, clientName, protocolTitle, itemForm, isViewing, isFinalizing, protocolStatus, queueSaveProtocol, supplierFreights]);
+  }, [allItems, clientName, protocolTitle, itemForm, isViewing, isFinalizing, protocolStatus, queueSaveProtocol, supplierFreights, priceTableId]);
 
   const handleSaveDraft = useCallback(async (
     forcedEstoque?: ProtocolItem[], forcedACotar?: ProtocolItem[], options?: { skipDiffLog?: boolean, silent?: boolean }
@@ -151,6 +179,7 @@ export function useProtocolPage({
         totals: { subtotal: totalsObj.subtotal, markup: totalsObj.markup, total: totalsObj.total },
         status: protocolStatus, draftForm: itemForm,
         supplierFreights,
+        priceTableId: priceTableId || undefined,
       }), options);
       if (!options?.silent) {
         toast.success('Rascunho salvo com sucesso!');
@@ -342,6 +371,7 @@ export function useProtocolPage({
     supplierFreights,
     setSupplierFreights,
     updateSupplierFreight,
+    priceTableId, setPriceTableId,
     isFormUnlocked, isItemFormValid, canFinalize, canSendToBling,
     handleSaveDraft, handleReservarEstoque, handleEnviarBling,
     handleCancelar, confirmCancelar, handleRestaurar, handleEstornar,

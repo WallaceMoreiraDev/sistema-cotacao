@@ -12,6 +12,9 @@ interface HeaderProtocoloProps {
   autoSaveStatus: 'idle' | 'saving' | 'saved';
   isViewing?: boolean;
   clientsLoading?: boolean;
+  priceTables?: { id: string; name: string }[];
+  priceTableId?: string;
+  setPriceTableId?: (id: string) => void;
 }
 
 export function HeaderProtocolo({
@@ -24,6 +27,9 @@ export function HeaderProtocolo({
   autoSaveStatus,
   isViewing = false,
   clientsLoading = false,
+  priceTables = [],
+  priceTableId = '',
+  setPriceTableId,
 }: HeaderProtocoloProps) {
   const [isClientDropdownOpen, setIsClientDropdownOpen] = useState(false);
 
@@ -93,7 +99,7 @@ export function HeaderProtocolo({
             )}
           </div>
 
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
             <div className="relative">
               <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1.5 flex items-center justify-between">
                 <span>Nome do Cliente *</span>
@@ -168,6 +174,24 @@ export function HeaderProtocolo({
                   className="w-full rounded-xl border border-slate-600 bg-white/5 px-4 py-2.5 text-sm font-medium text-white placeholder-slate-500 outline-none transition focus:border-slate-400"
                 />
               </div>
+
+            <div>
+              <label className="block text-[11px] font-semibold uppercase tracking-wider text-slate-400 mb-1.5">
+                Tabela de Preço (Opcional)
+              </label>
+              <select
+                value={priceTableId || ''}
+                onChange={(e) => setPriceTableId && setPriceTableId(e.target.value)}
+                className="w-full rounded-xl border border-slate-600 bg-white/5 px-4 py-2.5 text-sm font-medium text-white placeholder-slate-500 outline-none transition focus:border-slate-400 [&>option]:bg-slate-800"
+              >
+                <option value="">Sem tabela (Preço padrão)</option>
+                {priceTables.map((t) => (
+                  <option key={t.id} value={t.id}>
+                    {t.name}
+                  </option>
+                ))}
+              </select>
+            </div>
           </div>
         </fieldset>
       </div>

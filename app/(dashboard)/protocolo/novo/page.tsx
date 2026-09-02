@@ -26,6 +26,7 @@ export default function NewProtocolPage() {
 
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [sealFamilies, setSealFamilies] = useState<any[]>([]);
+  const [priceTables, setPriceTables] = useState<any[]>([]);
   const [editingItem, setEditingItem] = useState<any>(null);
 
   useEffect(() => {
@@ -34,6 +35,9 @@ export default function NewProtocolPage() {
     });
     import('../../../lib/actions/sealFamilies').then(m => {
       m.getSealFamiliesAction().then(res => { if (res.success && res.data) setSealFamilies(res.data); });
+    });
+    import('../../../lib/actions/priceTables').then(m => {
+      m.getPriceTablesAction().then(res => { if (res.success && res.data) setPriceTables(res.data); });
     });
   }, []);
 
@@ -55,7 +59,7 @@ export default function NewProtocolPage() {
     reallocatableItems, insufficientStockItems,
     handleExceedStock, handleConfirmSplit,
     handleConfirmDeficit, handleConfirmRealloc, handleConfirmIgnore,
-    protocolIdRef,
+    protocolIdRef, priceTableId, setPriceTableId
   } = useProtocolPage({
     initialViewing: false,
     navigateAfterSave: true,
@@ -80,6 +84,7 @@ export default function NewProtocolPage() {
         registeredClients={registeredClients} protocolTitle={protocolTitle}
         setProtocolTitle={setProtocolTitle} autoSaveStatus={autoSaveStatus}
         clientsLoading={clientsLoading}
+        priceTables={priceTables} priceTableId={priceTableId} setPriceTableId={setPriceTableId}
       />
 
       <FormularioAdicaoItem

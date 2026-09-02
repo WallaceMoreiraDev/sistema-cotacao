@@ -110,6 +110,24 @@ export interface Protocol {
   };
   supplierFreights?: Record<string, number>;
   draftForm?: any; // To hold the unsubmitted item form state
+  priceTableId?: string; // ID of the price table used for this protocol
+}
+
+// ─── Price Tables ───
+export interface PriceTable {
+  id: string;
+  name: string;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export interface PriceTableItem {
+  id: string;
+  price_table_id: string;
+  sku: string;
+  price: number;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 // ─── Client ───

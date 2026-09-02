@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react';
-import type { ProtocolItem, StockProduct } from '../types/database';
+import type { ProtocolItem, StockProduct, PriceTableItem } from '../types/database';
 import { areItemsMatching, formatMeasurement } from '../utils/protocolFormatters';
 import { buildSmartDescription, generateFMCode } from '../utils/productNameBuilder';
 import { ItemFormState, EMPTY_ITEM_FORM } from '../config/protocolForm';
@@ -17,7 +17,8 @@ export function useProtocolState(
   initialCotar: ProtocolItem[] = [],
   suppliers: any[] = [],
   userRole?: string,
-  initialSupplierFreights: Record<string, number> = {}
+  initialSupplierFreights: Record<string, number> = {},
+  priceTableItems: PriceTableItem[] = []
 ) {
   const [estoqueItems, setEstoqueItems] = useState<ProtocolItem[]>(initialEstoque);
   const [aCotarItems, setACotarItems] = useState<ProtocolItem[]>(initialCotar);
@@ -27,9 +28,21 @@ export function useProtocolState(
 
   const [itemCounter, setItemCounter] = useState(0);
 
+  const getFinalTablePrice = useCallback((sku: string | undefined) => {
+    if (!sku) return null;
+    const cleanSku = sku.replace(/^FM-/i, '').trim().toLowerCase();
+    const tableItem = priceTableItems.find(p => {
+      const pSku = p.sku.trim().toLowerCase();
+      return pSku === sku.trim().toLowerCase() || pSku === cleanSku || pSku === `fm-${cleanSku}`;
+    });
+    return tableItem ? tableItem.price : null;
+  }, [priceTableItems]);
+
   const updateSupplierFreight = useCallback((supplierId: string, cost: number) => {
     setSupplierFreights(prev => ({ ...prev, [supplierId]: cost }));
   }, []);
+
+
 
   const getFreeStock = useCallback((identifier: string, stockProducts: StockProduct[]) => {
     const product = stockProducts.find(p => getItemIdentifier(p) === identifier);
@@ -58,7 +71,7 @@ export function useProtocolState(
     const match = findStockMatch(stockProducts, itemForm.category, measurements, itemForm.brand);
     const identifier = match ? getItemIdentifier(match) : '';
     const availableStock = match ? getFreeStock(identifier, stockProducts) : 0;
-
+    
     let newCounter = itemCounter;
 
     if (!itemForm.ignoreStock && match && availableStock > 0) {
@@ -70,7 +83,7 @@ export function useProtocolState(
         id: `item-${Date.now()}-e`,
         name: itemForm.category || 'N/A',
         quantity: stockQty,
-        unitPrice: match.costPrice,
+        unitPrice: match.costPrice || 0,
         costPrice: match.costPrice,
         type: 'estoque',
         status: 'pendente',
@@ -83,8 +96,8 @@ export function useProtocolState(
         measurements,
         stockQty: availableStock,
         productId: match.id,
-        markupPercent: 70,
-        salePrice: match.costPrice * 1.7,
+        markupPercent: getFinalTablePrice(match.code) !== null ? undefined : 70,
+        salePrice: getFinalTablePrice(match.code) !== null ? getFinalTablePrice(match.code)! : (match.costPrice || 0) * 1.7,
       };
       setEstoqueItems(prev => {
         const existingIdx = prev.findIndex(i => areItemsMatching(i, stockItem));
@@ -102,7 +115,7 @@ export function useProtocolState(
           id: `item-${Date.now()}-c`,
           name: itemForm.category || 'N/A',
           quantity: remainQty,
-          unitPrice: 0,
+          unitPrice: match.costPrice || 0, // Inherits strictly the cost base
           costPrice: match.costPrice,
           productId: match.id,
           type: 'a_cotar',
@@ -136,7 +149,7 @@ export function useProtocolState(
         id: `item-${Date.now()}-c`,
         name: itemForm.category || 'N/A',
         quantity: qty,
-        unitPrice: 0,
+        unitPrice: (!itemForm.ignoreStock && match) ? (match.costPrice || 0) : 0,
         costPrice: (!itemForm.ignoreStock && match) ? match.costPrice : undefined,
         productId: match ? match.id : undefined,
         type: 'a_cotar',
@@ -184,7 +197,7 @@ export function useProtocolState(
         id: `item-${Date.now()}-e`,
         name: match.name || match.category || 'N/A',
         quantity: stockQty,
-        unitPrice: match.costPrice,
+        unitPrice: match.costPrice || 0,
         costPrice: match.costPrice,
         type: 'estoque',
         status: 'pendente',
@@ -197,8 +210,8 @@ export function useProtocolState(
         measurements: match.measurements || {},
         stockQty: availableStock,
         productId: match.id,
-        markupPercent: 70,
-        salePrice: match.costPrice * 1.7,
+        markupPercent: getFinalTablePrice(match.code || match.sku) !== null ? undefined : 70,
+        salePrice: getFinalTablePrice(match.code || match.sku) !== null ? getFinalTablePrice(match.code || match.sku)! : (match.costPrice || 0) * 1.7,
       };
       setEstoqueItems(prev => {
         const existingIdx = prev.findIndex(i => areItemsMatching(i, stockItem));
@@ -216,6 +229,7 @@ export function useProtocolState(
           id: `item-${Date.now()}-c`,
           name: match.name || match.category || 'N/A',
           quantity: remainQty,
+          unitPrice: match.costPrice || 0,
           costPrice: match.costPrice,
           type: 'a_cotar',
           status: 'pendente',
@@ -809,13 +823,32 @@ export function useProtocolState(
         }
       }
 
+      const isMisto = estoqueItems.some(est => areItemsMatching(est, item));
+      const sku = item.code || item.oem_code;
+      const tablePrice = isMisto ? getFinalTablePrice(sku) : null;
+
       const supId = item.supplierId;
       const baseCost = item.unitPrice ?? 0;
-      const mk = item.markupPercent ?? 70;
-      const precoVendaBase = baseCost * (1 + mk / 100);
-      const subtotalBaseLinha = precoVendaBase * Number(item.quantity);
-      const subtotalComImposto = subtotalBaseLinha * 1.045; // Imposto 4.5%
-      const taxAmount = subtotalComImposto - subtotalBaseLinha;
+      let mk: any = item.markupPercent ?? 70;
+
+      let sp = 0;
+      let subtotalBaseLinha = 0;
+      let subtotalComImposto = 0;
+      let taxAmount = 0;
+
+      if (tablePrice !== null) {
+        sp = tablePrice;
+        subtotalComImposto = sp * Number(item.quantity);
+        subtotalBaseLinha = subtotalComImposto / 1.045;
+        taxAmount = subtotalComImposto - subtotalBaseLinha;
+        mk = undefined;
+      } else {
+        if (item.markupPercent === undefined) mk = 70;
+        const precoVendaBase = baseCost * (1 + mk / 100);
+        subtotalBaseLinha = precoVendaBase * Number(item.quantity);
+        subtotalComImposto = subtotalBaseLinha * 1.045; // Imposto 4.5%
+        taxAmount = subtotalComImposto - subtotalBaseLinha;
+      }
 
       let totalFinalVenda = subtotalComImposto;
       let rateioFrete = 0;
@@ -838,7 +871,9 @@ export function useProtocolState(
         }
       }
 
-      const sp = totalFinalVenda / Number(item.quantity);
+      if (tablePrice === null) {
+        sp = totalFinalVenda / Number(item.quantity);
+      }
 
       if (
         changedByLock ||
@@ -846,7 +881,8 @@ export function useProtocolState(
         Math.abs((item.baseSubtotal ?? 0) - subtotalBaseLinha) > 0.001 ||
         Math.abs((item.taxAmount ?? 0) - taxAmount) > 0.001 ||
         Math.abs((item.freightAmount ?? 0) - rateioFrete) > 0.001 ||
-        Math.abs((item.finalTotal ?? 0) - totalFinalVenda) > 0.001
+        Math.abs((item.finalTotal ?? 0) - totalFinalVenda) > 0.001 ||
+        item.markupPercent !== mk
       ) {
         cotarChanged = true;
         return { 
@@ -854,6 +890,7 @@ export function useProtocolState(
           costPrice: currentCostPrice,
           productId: currentProductId,
           salePrice: sp,
+          markupPercent: mk,
           baseSubtotal: subtotalBaseLinha,
           taxAmount,
           freightAmount: rateioFrete,
@@ -871,15 +908,24 @@ export function useProtocolState(
       ));
       
       if (linkedACotar) {
-        // Misto: espelha o PREÇO DE VENDA UNITÁRIO do item cotado, para não haver inconsistência na tela.
-        const sp = linkedACotar.salePrice ?? 0;
+        const sku = est.code || est.oem_code;
+        const tablePrice = getFinalTablePrice(sku);
+        
+        let sp = 0;
+        let mk: any = linkedACotar.markupPercent ?? 70;
+        const baseCost = linkedACotar.unitPrice ?? 0;
+
+        if (tablePrice !== null) {
+          sp = tablePrice;
+          mk = undefined;
+        } else {
+          // Misto: espelha o PREÇO DE VENDA UNITÁRIO do item cotado
+          sp = linkedACotar.salePrice ?? 0;
+        }
+
         const subtotalComImposto = sp * Number(est.quantity);
         const subtotalBaseLinha = subtotalComImposto / 1.045; // Remove 4.5% para achar a base real (o frete foi absorvido como lucro na base)
         const taxAmount = subtotalComImposto - subtotalBaseLinha;
-        
-        // Mantemos o custo e markup visualmente iguais
-        const baseCost = linkedACotar.unitPrice ?? 0;
-        const mk = linkedACotar.markupPercent ?? 70;
 
         if (
           Math.abs((est.salePrice ?? 0) - sp) > 0.001 ||
@@ -907,24 +953,43 @@ export function useProtocolState(
         }
       } else {
         // Item puro de estoque: recebe 4.5% de imposto mas não tem frete.
-        const baseCost = est.unitPrice ?? 0;
-        const mk = est.markupPercent ?? 70;
-        const precoVendaBase = baseCost * (1 + mk / 100);
-        const subtotalBaseLinha = precoVendaBase * Number(est.quantity);
-        const subtotalComImposto = subtotalBaseLinha * 1.045; // Imposto 4.5%
-        const taxAmount = subtotalComImposto - subtotalBaseLinha;
-        const sp = subtotalComImposto / Number(est.quantity);
+        const sku = est.code || est.oem_code;
+        const tablePrice = getFinalTablePrice(sku);
+
+        let sp = 0;
+        let subtotalComImposto = 0;
+        let subtotalBaseLinha = 0;
+        let taxAmount = 0;
+        let mk = est.markupPercent ?? 70;
+
+        if (tablePrice !== null) {
+          sp = tablePrice;
+          subtotalComImposto = sp * Number(est.quantity);
+          subtotalBaseLinha = subtotalComImposto / 1.045;
+          taxAmount = subtotalComImposto - subtotalBaseLinha;
+          mk = undefined as any;
+        } else {
+          const baseCost = est.unitPrice ?? 0;
+          if (est.markupPercent === undefined) mk = 70; // Revert to standard if table price lost
+          const precoVendaBase = baseCost * (1 + mk / 100);
+          subtotalBaseLinha = precoVendaBase * Number(est.quantity);
+          subtotalComImposto = subtotalBaseLinha * 1.045;
+          taxAmount = subtotalComImposto - subtotalBaseLinha;
+          sp = subtotalComImposto / Number(est.quantity);
+        }
         
         if (
           Math.abs((est.salePrice ?? 0) - sp) > 0.001 ||
           Math.abs((est.baseSubtotal ?? 0) - subtotalBaseLinha) > 0.001 ||
           Math.abs((est.taxAmount ?? 0) - taxAmount) > 0.001 ||
           Math.abs((est.freightAmount ?? 0) - 0) > 0.001 ||
-          Math.abs((est.finalTotal ?? 0) - subtotalComImposto) > 0.001
+          Math.abs((est.finalTotal ?? 0) - subtotalComImposto) > 0.001 ||
+          est.markupPercent !== mk
         ) {
           estoqueChanged = true;
           return { 
             ...est, 
+            markupPercent: mk,
             salePrice: sp,
             baseSubtotal: subtotalBaseLinha,
             taxAmount,
@@ -943,7 +1008,7 @@ export function useProtocolState(
       setEstoqueItems(newEstoque);
     }
 
-  }, [aCotarItems, estoqueItems, suppliers, supplierFreights]); // Dependências completas
+  }, [aCotarItems, estoqueItems, suppliers, supplierFreights, getFinalTablePrice]); // Dependências completas
 
   return {
     estoqueItems,

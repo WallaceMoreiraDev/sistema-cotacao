@@ -89,12 +89,12 @@ export function TabelaEstoque({ items, updateQuantity, removeItem, getFreeStock,
                     <td className="px-4 py-3 text-center">
                       <input
                         type="number"
-                        min="1"
-                        step="1"
+                        min="0.001"
+                        step="any"
                         value={item.quantity}
                         onChange={(e) => {
-                          const val = parseInt(e.target.value);
-                          if (isNaN(val) || val < 1) return;
+                          const val = parseFloat(e.target.value);
+                          if (isNaN(val) || val <= 0) return;
                           
                           const identifier = item.code || item.oem || item.name;
                           const freeStock = getFreeStock(identifier);
@@ -215,12 +215,12 @@ export function TabelaEstoque({ items, updateQuantity, removeItem, getFreeStock,
                     <span className="text-[10px] font-bold text-slate-400 uppercase">Qtd</span>
                     <input
                       type="number"
-                      min="1"
-                      step="1"
+                      min="0.001"
+                      step="any"
                       value={item.quantity}
                       onChange={(e) => {
-                        const val = parseInt(e.target.value);
-                        if (isNaN(val) || val < 1) return;
+                        const val = parseFloat(e.target.value);
+                        if (isNaN(val) || val <= 0) return;
                         
                         const identifier = item.code || item.oem || item.name;
                         const freeStock = getFreeStock(identifier);

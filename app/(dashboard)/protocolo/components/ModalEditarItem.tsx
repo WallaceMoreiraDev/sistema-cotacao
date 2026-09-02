@@ -191,7 +191,7 @@ export function ModalEditarItem({
                 <label className="block text-xs font-bold text-slate-700 mb-1">Quantidade <span className="text-red-500">*</span></label>
                 <input
                   type="number"
-                  min="1"
+                  min="0.001"
                   step="any"
                   value={form.quantity}
                   onChange={(e) => updateField('quantity', e.target.value)}

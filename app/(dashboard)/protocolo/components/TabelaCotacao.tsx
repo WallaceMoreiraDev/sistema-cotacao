@@ -181,7 +181,8 @@ export function TabelaCotacao({
                       <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">QTD</label>
                       <input
                         type="number"
-                        min="1"
+                        min="0.001"
+                        step="any"
                         value={item.quantity}
                         onChange={(e) => updateQuantity(item.id, Number(e.target.value))}
                         disabled={isViewing || isPurchased}

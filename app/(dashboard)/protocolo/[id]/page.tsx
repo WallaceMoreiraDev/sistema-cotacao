@@ -32,6 +32,7 @@ export default function ProtocolDetailPage() {
   );
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [sealFamilies, setSealFamilies] = useState<any[]>([]);
+  const [priceTables, setPriceTables] = useState<any[]>([]);
   const [editingItem, setEditingItem] = useState<ProtocolItem | null>(null);
   useEffect(() => {
     import('../../../lib/actions/suppliers').then(m => {
@@ -39,6 +40,9 @@ export default function ProtocolDetailPage() {
     });
     import('../../../lib/actions/sealFamilies').then(m => {
       m.getSealFamiliesAction().then(res => { if (res.success && res.data) setSealFamilies(res.data); });
+    });
+    import('../../../lib/actions/priceTables').then(m => {
+      m.getPriceTablesAction().then(res => { if (res.success && res.data) setPriceTables(res.data); });
     });
   }, []);
   const {
@@ -63,6 +67,7 @@ export default function ProtocolDetailPage() {
     handleExceedStock, handleConfirmSplit,
     handleConfirmDeficit, handleConfirmRealloc, handleConfirmIgnore,
     supplierFreights, setSupplierFreights, updateSupplierFreight,
+    priceTableId, setPriceTableId,
   } = useProtocolPage({
     protocolId: params?.id,
     initialViewing: true,
@@ -94,6 +99,7 @@ export default function ProtocolDetailPage() {
           setACotarItems(p.items?.filter(i => i.type === 'a_cotar') || []);
           if (p.draftForm) setItemForm(p.draftForm as ItemFormState);
           setSupplierFreights(p.supplierFreights || {});
+          if (p.priceTableId) setPriceTableId(p.priceTableId);
         }
         setIsProtocolLoading(false);
       });
@@ -139,7 +145,9 @@ export default function ProtocolDetailPage() {
       <HeaderProtocolo clientName={clientName} setClientName={setClientName}
         registeredClients={registeredClients} protocolTitle={protocolTitle}
         setProtocolTitle={setProtocolTitle} protocolStatus={protocolStatus}
-        autoSaveStatus={autoSaveStatus} isViewing={isViewing} clientsLoading={clientsLoading} />
+        setProtocolStatus={setProtocolStatus}
+        autoSaveStatus={autoSaveStatus} isViewing={isViewing} clientsLoading={clientsLoading} 
+        priceTables={priceTables} priceTableId={priceTableId} setPriceTableId={setPriceTableId} />
       <FormularioAdicaoItem itemForm={itemForm} sealFamilies={sealFamilies}
         updateItemField={updateItemField} updateMeasurement={updateMeasurement}
         isItemFormValid={isItemFormValid} isFormUnlocked={isFormUnlocked}

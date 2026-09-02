@@ -12,6 +12,7 @@ export function createProtocol(initial: Partial<Protocol>): Protocol {
     totals: initial.totals ?? { subtotal: 0, markup: 0, total: 0 },
     draftForm: initial.draftForm,
     supplierFreights: initial.supplierFreights,
+    priceTableId: initial.priceTableId,
   } as Protocol;
 }
 

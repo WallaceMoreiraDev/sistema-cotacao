@@ -355,7 +355,7 @@ export function FormularioAdicaoItem({
                         <div className="flex items-center gap-2">
                           <input 
                             type="number"
-                            min="1"
+                            min="0.001"
                             step="any"
                             value={localQuantities[product.id] || '1'}
                             onChange={(e) => setLocalQuantities(prev => ({ ...prev, [product.id]: e.target.value }))}
