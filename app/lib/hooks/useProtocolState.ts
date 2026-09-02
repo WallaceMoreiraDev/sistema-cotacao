@@ -229,7 +229,6 @@ export function useProtocolState(
           id: `item-${Date.now()}-c`,
           name: match.name || match.category || 'N/A',
           quantity: remainQty,
-          unitPrice: match.costPrice || 0,
           costPrice: match.costPrice,
           type: 'a_cotar',
           status: 'pendente',

@@ -9,6 +9,7 @@ interface HeaderProtocoloProps {
   protocolTitle: string;
   setProtocolTitle: (title: string) => void;
   protocolStatus?: string;
+  setProtocolStatus?: (status: any) => void;
   autoSaveStatus: 'idle' | 'saving' | 'saved';
   isViewing?: boolean;
   clientsLoading?: boolean;
