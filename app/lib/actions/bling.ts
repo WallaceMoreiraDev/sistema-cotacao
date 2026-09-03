@@ -22,11 +22,55 @@ export async function enviarParaBlingAction(protocolId: string | number): Promis
 
     // Try to find client bling_id
     let blingClientId = null;
+    let clientRowId = null;
+    let clientCnpj = null;
+
     if (protocol.client_name) {
-      const { data: client } = await supabase.from('clients').select('bling_id').eq('name', protocol.client_name).single();
-      if (client && client.bling_id) {
-        blingClientId = client.bling_id;
+      const { data: client } = await supabase.from('clients').select('id, bling_id, cnpj').eq('name', protocol.client_name).single();
+      if (client) {
+        clientRowId = client.id;
+        clientCnpj = client.cnpj;
+        if (client.bling_id) {
+          blingClientId = client.bling_id;
+        }
       }
+    }
+
+    // If still no blingClientId, create the contact in Bling!
+    if (!blingClientId && protocol.client_name) {
+      try {
+        await new Promise(resolve => setTimeout(resolve, 600)); // Rate limit protection
+        
+        let tipoPessoa = 'J';
+        if (clientCnpj) {
+          const cleanDoc = clientCnpj.replace(/\D/g, '');
+          if (cleanDoc.length === 11) tipoPessoa = 'F';
+        }
+
+        const contactPayload: any = {
+          nome: protocol.client_name,
+          tipo: tipoPessoa,
+          situacao: 'A'
+        };
+
+        if (clientCnpj) {
+          contactPayload.numeroDocumento = clientCnpj;
+        }
+
+        const newContact = await BlingService.createContact(contactPayload);
+        blingClientId = newContact.id;
+        
+        if (clientRowId) {
+          await supabase.from('clients').update({ bling_id: newContact.id }).eq('id', clientRowId);
+        }
+      } catch (err: any) {
+        console.error('Erro ao criar contato automático no Bling', err);
+        throw new Error(`O cliente '${protocol.client_name}' não possui vínculo no Bling e ocorreu um erro ao tentar criá-lo automaticamente: ${err.message}`);
+      }
+    }
+
+    if (!blingClientId) {
+      throw new Error(`O cliente do protocolo não é válido ou não pôde ser criado no Bling.`);
     }
 
     // Fetch protocol items
@@ -41,10 +85,7 @@ export async function enviarParaBlingAction(protocolId: string | number): Promis
     const blingItems = [];
 
     for (const item of items) {
-      // Wait 400ms between items to prevent Rate Limit (429 TOO_MANY_REQUESTS) - Bling allows max 3 req/sec
-      if (blingItems.length > 0) {
-        await new Promise(resolve => setTimeout(resolve, 400));
-      }
+      // Removed loop-level delay; we delay exactly before API calls now to prevent slowing down cached items.
 
       // Get the product bling_id. If it's a stock item, it should have it in stock_products.
       let blingProductId = null;
@@ -64,6 +105,8 @@ export async function enviarParaBlingAction(protocolId: string | number): Promis
       // If still no blingProductId (e.g. custom item "A Cotar"), we must create it in Bling!
       if (!blingProductId) {
         try {
+          // Delay explicitly before Bling API call
+          await new Promise(resolve => setTimeout(resolve, 600));
           const newProd = await BlingService.createProduct({
             nome: item.name,
             tipo: 'P',
@@ -102,7 +145,7 @@ export async function enviarParaBlingAction(protocolId: string | number): Promis
           if (bestSupplierId) {
             const { data: supData } = await supabase.from('suppliers').select('bling_id').eq('id', bestSupplierId).single();
             if (supData && supData.bling_id) {
-              await new Promise(resolve => setTimeout(resolve, 400));
+              await new Promise(resolve => setTimeout(resolve, 600));
               await BlingService.addSupplierToProduct(blingProductId, supData.bling_id, bestCost);
             }
           }
@@ -139,12 +182,14 @@ export async function enviarParaBlingAction(protocolId: string | number): Promis
 
     // Now create the Proposal in Bling
     const propostaData = {
-      contato: blingClientId ? { id: Number(blingClientId) } : { nome: protocol.client_name },
+      contato: { id: Number(blingClientId) },
       situacao: 0, // Pendente/Em Aberto
       itens: blingItems
     };
 
     try {
+      // Delay explicitly before Bling API call
+      await new Promise(resolve => setTimeout(resolve, 600));
       await BlingService.createPropostaComercial(propostaData);
     } catch (propErr: any) {
       console.error('Erro ao criar proposta comercial no Bling:', propErr);

@@ -127,25 +127,48 @@ export class BlingService {
   /**
    * Authenticated request to Bling API
    */
-  static async request(endpoint: string, options: RequestInit = {}) {
+  static async request(endpoint: string, options: RequestInit = {}, retries = 3) {
     const token = await this.refreshTokenIfNeeded();
 
     const url = endpoint.startsWith('http') ? endpoint : `${BLING_API_BASE}${endpoint}`;
 
-    const response = await fetch(url, {
+    let response;
+    const fetchOptions = {
       ...options,
       headers: {
         'Authorization': `Bearer ${token}`,
         'Content-Type': 'application/json',
         ...options.headers,
       }
-    });
+    };
 
-    if (!response.ok) {
-      console.error(`Bling API Error [${response.status}] for ${url}`);
+    for (let attempt = 1; attempt <= retries; attempt++) {
+      try {
+        response = await fetch(url, fetchOptions);
+      } catch (error: any) {
+        if ((error.message === 'fetch failed' || error.code === 'ECONNRESET') && attempt < retries) {
+          console.warn(`[BlingService] Network error on ${url}, retrying (${attempt}/${retries})...`);
+          await new Promise(res => setTimeout(res, 300 * attempt));
+          continue;
+        } else {
+          throw error;
+        }
+      }
+
+      if (response.status === 429 && attempt < retries) {
+        console.warn(`[BlingService] Rate limit hit (429) on ${url}, backing off for 1.2s...`);
+        await new Promise(res => setTimeout(res, 1200));
+        continue;
+      }
+
+      break;
     }
 
-    return response;
+    if (response && !response.ok) {
+      console.error(`Bling API Error [${response?.status}] for ${url}`);
+    }
+
+    return response as Response;
   }
 
   /**
@@ -454,5 +477,23 @@ export class BlingService {
 
     const result = await response.json();
     return result.data; // Array of categories
+  }
+
+  /**
+   * Create a Contact (Client) in Bling
+   */
+  static async createContact(contactData: { nome: string; tipo: string; situacao: string; numeroDocumento?: string }) {
+    const response = await this.request('/contatos', {
+      method: 'POST',
+      body: JSON.stringify(contactData)
+    });
+
+    if (!response.ok) {
+      const errText = await response.text();
+      throw new Error(`Falha ao criar contato no Bling: ${response.status} - ${errText}`);
+    }
+
+    const result = await response.json();
+    return result.data;
   }
 }
