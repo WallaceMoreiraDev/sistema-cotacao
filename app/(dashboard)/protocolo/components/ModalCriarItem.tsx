@@ -26,14 +26,7 @@ export function ModalCriarItem({
   // Real-time preview of the smart description
   const previewName = buildSmartDescription({
     category: itemForm.category,
-    measurements: {
-      innerDiameter: itemForm.measurements.innerDiameter ? Number(itemForm.measurements.innerDiameter) : undefined,
-      outerDiameter: itemForm.measurements.outerDiameter ? Number(itemForm.measurements.outerDiameter) : undefined,
-      height1: itemForm.measurements.height1 ? Number(itemForm.measurements.height1) : undefined,
-      height2: itemForm.measurements.height2 ? Number(itemForm.measurements.height2) : undefined,
-      thickness: itemForm.measurements.thickness ? Number(itemForm.measurements.thickness) : undefined,
-      cs: itemForm.measurements.cs ? Number(itemForm.measurements.cs) : undefined,
-    },
+    measurements: itemForm.measurements,
     partType: itemForm.partType,
     supplierCode: itemForm.supplierCode,
     parkerOemCode: itemForm.parkerCode || itemForm.oemCode,
@@ -99,8 +92,8 @@ export function ModalCriarItem({
                     <div key={field.key}>
                       <label className="block text-[10px] font-semibold text-slate-500 mb-1">{field.label}</label>
                       <input
-                        type="number"
-                        step="any"
+                        type="text"
+                        inputMode="decimal"
                         value={itemForm.measurements[field.key]}
                         onChange={(e) => updateMeasurement(field.key, e.target.value)}
                         placeholder="0.00"

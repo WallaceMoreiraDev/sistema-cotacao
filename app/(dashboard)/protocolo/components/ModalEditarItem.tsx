@@ -68,14 +68,7 @@ export function ModalEditarItem({
 
   const previewName = buildSmartDescription({
     category: form.category,
-    measurements: {
-      innerDiameter: form.measurements.innerDiameter ? Number(form.measurements.innerDiameter) : undefined,
-      outerDiameter: form.measurements.outerDiameter ? Number(form.measurements.outerDiameter) : undefined,
-      height1: form.measurements.height1 ? Number(form.measurements.height1) : undefined,
-      height2: form.measurements.height2 ? Number(form.measurements.height2) : undefined,
-      thickness: form.measurements.thickness ? Number(form.measurements.thickness) : undefined,
-      cs: form.measurements.cs ? Number(form.measurements.cs) : undefined,
-    },
+    measurements: form.measurements,
     partType: form.partType,
     supplierCode: form.supplierCode,
     parkerOemCode: form.parkerCode || form.oemCode,
@@ -101,12 +94,12 @@ export function ModalEditarItem({
       description: form.description,
       measurements: {
         ...item.measurements, // preserve excludeFromPurchasing etc
-        innerDiameter: form.measurements.innerDiameter ? Number(form.measurements.innerDiameter) : undefined,
-        outerDiameter: form.measurements.outerDiameter ? Number(form.measurements.outerDiameter) : undefined,
-        height1: form.measurements.height1 ? Number(form.measurements.height1) : undefined,
-        height2: form.measurements.height2 ? Number(form.measurements.height2) : undefined,
-        thickness: form.measurements.thickness ? Number(form.measurements.thickness) : undefined,
-        cs: form.measurements.cs ? Number(form.measurements.cs) : undefined,
+        innerDiameter: form.measurements.innerDiameter ? Number(form.measurements.innerDiameter.replace(',', '.')) : undefined,
+        outerDiameter: form.measurements.outerDiameter ? Number(form.measurements.outerDiameter.replace(',', '.')) : undefined,
+        height1: form.measurements.height1 ? Number(form.measurements.height1.replace(',', '.')) : undefined,
+        height2: form.measurements.height2 ? Number(form.measurements.height2.replace(',', '.')) : undefined,
+        thickness: form.measurements.thickness ? Number(form.measurements.thickness.replace(',', '.')) : undefined,
+        cs: form.measurements.cs ? Number(form.measurements.cs.replace(',', '.')) : undefined,
       }
     };
 
@@ -164,8 +157,8 @@ export function ModalEditarItem({
                     <div key={field.key}>
                       <label className="block text-[10px] font-semibold text-slate-500 mb-1">{field.label}</label>
                       <input
-                        type="number"
-                        step="any"
+                        type="text"
+                        inputMode="decimal"
                         value={form.measurements[field.key]}
                         onChange={(e) => updateMeasurement(field.key, e.target.value)}
                         placeholder="0.00"

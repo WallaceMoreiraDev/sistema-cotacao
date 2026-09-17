@@ -326,12 +326,12 @@ export function useProtocolState(
 
     // Transform string measurements to number
     const measurements = {
-      innerDiameter: itemForm.measurements.innerDiameter ? Number(itemForm.measurements.innerDiameter) : undefined,
-      outerDiameter: itemForm.measurements.outerDiameter ? Number(itemForm.measurements.outerDiameter) : undefined,
-      height1: itemForm.measurements.height1 ? Number(itemForm.measurements.height1) : undefined,
-      height2: itemForm.measurements.height2 ? Number(itemForm.measurements.height2) : undefined,
-      thickness: itemForm.measurements.thickness ? Number(itemForm.measurements.thickness) : undefined,
-      cs: itemForm.measurements.cs ? Number(itemForm.measurements.cs) : undefined,
+      innerDiameter: itemForm.measurements.innerDiameter ? Number(itemForm.measurements.innerDiameter.replace(',', '.')) : undefined,
+      outerDiameter: itemForm.measurements.outerDiameter ? Number(itemForm.measurements.outerDiameter.replace(',', '.')) : undefined,
+      height1: itemForm.measurements.height1 ? Number(itemForm.measurements.height1.replace(',', '.')) : undefined,
+      height2: itemForm.measurements.height2 ? Number(itemForm.measurements.height2.replace(',', '.')) : undefined,
+      thickness: itemForm.measurements.thickness ? Number(itemForm.measurements.thickness.replace(',', '.')) : undefined,
+      cs: itemForm.measurements.cs ? Number(itemForm.measurements.cs.replace(',', '.')) : undefined,
     };
 
     const smartName = buildSmartDescription({
@@ -788,7 +788,7 @@ export function useProtocolState(
   const updateMeasurement = useCallback((key: keyof ItemFormState['measurements'], value: string) => {
     setItemForm(prev => ({
       ...prev,
-      measurements: { ...prev.measurements, [key]: value.replace(',', '.') },
+      measurements: { ...prev.measurements, [key]: value },
     }));
   }, []);
 
