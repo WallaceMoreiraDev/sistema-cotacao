@@ -336,7 +336,7 @@ export function useProtocolState(
 
     const smartName = buildSmartDescription({
       category: itemForm.category,
-      measurements: measurements,
+      measurements: itemForm.measurements,
       partType: itemForm.partType,
       supplierCode: itemForm.supplierCode,
       parkerOemCode: itemForm.parkerCode || itemForm.oemCode,
