@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { ItemFormState, MEASUREMENT_FIELDS, EMPTY_ITEM_FORM } from '../../../lib/config/protocolForm';
-import { buildSmartDescription } from '../../../lib/utils/productNameBuilder';
+import { buildSmartDescription, generateFMCode } from '../../../lib/utils/productNameBuilder';
 import type { ProtocolItem } from '../../../lib/types/database';
 
 interface ModalEditarItemProps {
@@ -88,7 +88,7 @@ export function ModalEditarItem({
       quantity: Number(form.quantity),
       observation: form.observation,
       part_type: form.partType,
-      code: form.supplierCode ? `FM-${form.supplierCode.toUpperCase()}` : undefined,
+      code: generateFMCode({ category: form.category, measurements: form.measurements, supplierCode: form.supplierCode, brand: form.brand }) || undefined,
       parker_code: form.parkerCode,
       oem_code: form.oemCode,
       description: form.description,

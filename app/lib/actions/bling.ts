@@ -4,6 +4,7 @@ import { createClient } from '../supabase/server';
 import { BlingService } from '../services/blingService';
 import { insertLogAction } from './logs';
 import { insertSystemErrorAction } from './systemErrors';
+import { generateFMCode } from '../utils/productNameBuilder';
 
 /**
  * Enviar para Bling Action
@@ -107,10 +108,20 @@ export async function enviarParaBlingAction(protocolId: string | number): Promis
         try {
           // Delay explicitly before Bling API call
           await new Promise(resolve => setTimeout(resolve, 600));
+          const fallbackCode = generateFMCode({ 
+            category: item.category || '', 
+            measurements: item.measurements, 
+            supplierCode: item.supplier_code || undefined,
+            brand: item.brand || undefined
+          });
+          
           const newProd = await BlingService.createProduct({
             nome: item.name,
+            codigo: item.code || fallbackCode || undefined,
             tipo: 'P',
             formato: 'S',
+            condicao: 1, // 1 = Novo
+            tipoProducao: 'T', // T = Terceiros
             preco: item.sale_price || item.unit_price,
             situacao: 'A',
             marca: item.brand || '',
@@ -165,7 +176,7 @@ export async function enviarParaBlingAction(protocolId: string | number): Promis
           await insertSystemErrorAction({
             error_type: 'bling_api_product',
             message: `Falha ao criar o produto "${item.name}" no Bling: ${blingErrorMsg}`,
-            details: prodErr.response?.data || prodErr,
+            details: prodErr.response?.data || prodErr.message,
             protocol_id: protocolId
           });
 
@@ -183,7 +194,6 @@ export async function enviarParaBlingAction(protocolId: string | number): Promis
     // Now create the Proposal in Bling
     const propostaData = {
       contato: { id: Number(blingClientId) },
-      situacao: 0, // Pendente/Em Aberto
       itens: blingItems
     };
 
@@ -206,7 +216,7 @@ export async function enviarParaBlingAction(protocolId: string | number): Promis
       await insertSystemErrorAction({
         error_type: 'bling_api_proposal',
         message: `Falha ao criar proposta comercial: ${blingErrorMsg}`,
-        details: propErr.response?.data || propErr,
+        details: propErr.response?.data || propErr.message,
         protocol_id: protocolId
       });
 

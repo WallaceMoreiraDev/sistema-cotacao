@@ -4,6 +4,14 @@ export function formatCurrency(amount: number) {
 
 export function formatMeasurement(val: number | undefined): string {
   if (val === undefined || val === null) return '-';
+  if (Number.isInteger(val)) return `${val} mm`;
+  
+  const str = val.toString();
+  const decimals = str.split('.')[1];
+  if (decimals && decimals.length === 1) {
+    return `${val.toFixed(2)} mm`;
+  }
+  
   return `${val} mm`;
 }
 

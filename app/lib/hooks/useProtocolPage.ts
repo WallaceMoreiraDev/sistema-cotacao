@@ -223,14 +223,21 @@ export function useProtocolPage({
     forcedEstoque?: ProtocolItem[], forcedACotar?: ProtocolItem[], options?: { skipDiffLog?: boolean }
   ) => {
     setIsFinalizing(true);
-    const toastId = toast.loading('Enviando para o Bling... (Isso pode demorar alguns segundos)', { duration: 30000 });
+    const toastId = toast.loading('Enviando para o Bling... (Pode demorar devido a limites de requisição)', { duration: Infinity });
     try {
       await handleSaveDraft(forcedEstoque, forcedACotar, { ...options, silent: true });
       const res = await enviarParaBlingAction(protocolIdRef.current);
-      if (res.success) { toast.success('Enviado para o Bling com sucesso!', { id: toastId }); setProtocolStatus('finalizado'); setIsViewing(true); }
-      else toast.error(res.error || 'Erro ao enviar para o Bling', { id: toastId });
+      if (res.success) { 
+        toast.success('Enviado para o Bling com sucesso!', { id: toastId }); 
+        setProtocolStatus('finalizado'); 
+        setIsViewing(true); 
+      } else {
+        toast.dismiss(toastId);
+        toast.error(res.error || 'Erro ao enviar para o Bling', { duration: 8000 });
+      }
     } catch (err: any) {
-      toast.error('Erro ao enviar para o Bling.', { id: toastId });
+      toast.dismiss(toastId);
+      toast.error('Erro ao enviar para o Bling.', { duration: 8000 });
     } finally { setIsFinalizing(false); }
   }, [handleSaveDraft]);
 

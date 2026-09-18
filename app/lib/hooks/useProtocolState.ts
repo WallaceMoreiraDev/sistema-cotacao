@@ -88,7 +88,7 @@ export function useProtocolState(
         type: 'estoque',
         status: 'pendente',
         oem_code: itemForm.oemCode || match.oem_code || undefined,
-        code: match.code || (itemForm.supplierCode ? `FM-${itemForm.supplierCode.toUpperCase()}` : undefined),
+        code: match.code || generateFMCode({ category: itemForm.category, measurements, supplierCode: itemForm.supplierCode, brand: itemForm.brand }) || undefined,
         brand: itemForm.brand || match.brand || undefined,
         part_type: itemForm.partType || match.part_type || undefined,
         parker_code: itemForm.parkerCode || match.parker_code || undefined,
@@ -121,7 +121,7 @@ export function useProtocolState(
           type: 'a_cotar',
           status: 'pendente',
           oem_code: itemForm.oemCode || undefined,
-          code: itemForm.supplierCode ? `FM-${itemForm.supplierCode.toUpperCase()}` : undefined,
+          code: generateFMCode({ category: itemForm.category, measurements, supplierCode: itemForm.supplierCode, brand: itemForm.brand }) || undefined,
           brand: itemForm.brand || undefined,
           part_type: itemForm.partType || undefined,
           parker_code: itemForm.parkerCode || undefined,
@@ -155,7 +155,7 @@ export function useProtocolState(
         type: 'a_cotar',
         status: 'pendente',
         oem_code: itemForm.oemCode || undefined,
-        code: itemForm.supplierCode ? `FM-${itemForm.supplierCode.toUpperCase()}` : undefined,
+        code: generateFMCode({ category: itemForm.category, measurements, supplierCode: itemForm.supplierCode, brand: itemForm.brand }) || undefined,
         brand: itemForm.brand || undefined,
         part_type: itemForm.partType || undefined,
         parker_code: itemForm.parkerCode || undefined,
@@ -343,7 +343,7 @@ export function useProtocolState(
       brand: itemForm.brand,
     });
     
-    const fmCode = generateFMCode(itemForm.supplierCode);
+    const fmCode = generateFMCode({ category: itemForm.category, measurements, supplierCode: itemForm.supplierCode, brand: itemForm.brand });
 
     const newItem: ProtocolItem = {
       id: `item-${Date.now()}-c`,

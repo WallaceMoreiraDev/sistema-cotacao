@@ -3,6 +3,34 @@ import { getSystemSettingsAction, updateSystemSettingsAction } from '../actions/
 const BLING_API_BASE = 'https://api.bling.com.br/Api/v3';
 
 export class BlingService {
+  private static refreshPromise: Promise<string> | null = null;
+  private static lastRequestTime: number = 0;
+  private static readonly MIN_DELAY_MS = 400; // max 2.5 req/sec
+
+  private static async waitForRateLimit() {
+    const now = Date.now();
+    let waitTime = 0;
+
+    if (this.lastRequestTime > now) {
+      // There is already a queue in the future
+      waitTime = (this.lastRequestTime - now) + this.MIN_DELAY_MS;
+      this.lastRequestTime = now + waitTime;
+    } else {
+      // Last request was in the past
+      const timeSinceLast = now - this.lastRequestTime;
+      if (timeSinceLast < this.MIN_DELAY_MS) {
+        waitTime = this.MIN_DELAY_MS - timeSinceLast;
+        this.lastRequestTime = now + waitTime;
+      } else {
+        this.lastRequestTime = now;
+      }
+    }
+
+    if (waitTime > 0) {
+      await new Promise(res => setTimeout(res, waitTime));
+    }
+  }
+
   private static async getSettings() {
     const { success, data } = await getSystemSettingsAction();
     if (!success || !data) throw new Error('Não foi possível carregar as configurações do sistema.');
@@ -71,63 +99,74 @@ export class BlingService {
     return data;
   }
 
-  /**
-   * Refreshes the access token if it is expired or about to expire.
-   */
-  static async refreshTokenIfNeeded() {
-    let settings = await this.getSettings();
-
-    if (!settings.bling_access_token || !settings.bling_refresh_token || !settings.bling_token_expires_at) {
-      throw new Error('O Bling não está autenticado. É necessário realizar a conexão OAuth primeiro.');
+  static async refreshTokenIfNeeded(): Promise<string> {
+    if (this.refreshPromise) {
+      return this.refreshPromise;
     }
 
-    const expiresAt = new Date(settings.bling_token_expires_at).getTime();
-    const now = Date.now();
-    // 5 minutes buffer
-    const buffer = 5 * 60 * 1000;
+    this.refreshPromise = (async () => {
+      try {
+        let settings = await this.getSettings();
 
-    if (now > expiresAt - buffer) {
-      console.log('Bling token expirarado ou prestes a expirar. Atualizando...');
-      const credentials = Buffer.from(`${settings.bling_client_id}:${settings.bling_client_secret}`).toString('base64');
+        if (!settings.bling_access_token || !settings.bling_refresh_token || !settings.bling_token_expires_at) {
+          throw new Error('O Bling não está autenticado. É necessário realizar a conexão OAuth primeiro.');
+        }
 
-      const params = new URLSearchParams();
-      params.append('grant_type', 'refresh_token');
-      params.append('refresh_token', settings.bling_refresh_token);
+        const expiresAt = new Date(settings.bling_token_expires_at).getTime();
+        const now = Date.now();
+        // 5 minutes buffer
+        const buffer = 5 * 60 * 1000;
 
-      const response = await fetch(`${BLING_API_BASE}/oauth/token`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-          'Authorization': `Basic ${credentials}`,
-          'Accept': '1.0'
-        },
-        body: params.toString()
-      });
+        if (now > expiresAt - buffer) {
+          console.log('Bling token expirarado ou prestes a expirar. Atualizando...');
+          const credentials = Buffer.from(`${settings.bling_client_id}:${settings.bling_client_secret}`).toString('base64');
 
-      if (!response.ok) {
-        throw new Error('Falha ao renovar o token do Bling. É necessário reconectar manualmente.');
+          const params = new URLSearchParams();
+          params.append('grant_type', 'refresh_token');
+          params.append('refresh_token', settings.bling_refresh_token);
+
+          const response = await fetch(`${BLING_API_BASE}/oauth/token`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/x-www-form-urlencoded',
+              'Authorization': `Basic ${credentials}`,
+              'Accept': '1.0'
+            },
+            body: params.toString()
+          });
+
+          if (!response.ok) {
+            const errText = await response.text();
+            console.error('BLING REFRESH ERROR:', errText);
+            throw new Error(`Falha ao renovar o token do Bling. É necessário reconectar manualmente. Erro: ${errText}`);
+          }
+
+          const data = await response.json();
+          const newExpiresAt = new Date(Date.now() + (data.expires_in * 1000)).toISOString();
+
+          await updateSystemSettingsAction({
+            ...settings,
+            bling_access_token: data.access_token,
+            bling_refresh_token: data.refresh_token,
+            bling_token_expires_at: newExpiresAt
+          });
+
+          settings.bling_access_token = data.access_token;
+        }
+
+        return settings.bling_access_token as string;
+      } finally {
+        BlingService.refreshPromise = null;
       }
+    })();
 
-      const data = await response.json();
-      const newExpiresAt = new Date(Date.now() + (data.expires_in * 1000)).toISOString();
-
-      await updateSystemSettingsAction({
-        ...settings,
-        bling_access_token: data.access_token,
-        bling_refresh_token: data.refresh_token,
-        bling_token_expires_at: newExpiresAt
-      });
-
-      settings.bling_access_token = data.access_token;
-    }
-
-    return settings.bling_access_token;
+    return this.refreshPromise;
   }
 
   /**
    * Authenticated request to Bling API
    */
-  static async request(endpoint: string, options: RequestInit = {}, retries = 3) {
+  static async request(endpoint: string, options: RequestInit = {}, retries = 5) {
     const token = await this.refreshTokenIfNeeded();
 
     const url = endpoint.startsWith('http') ? endpoint : `${BLING_API_BASE}${endpoint}`;
@@ -144,6 +183,7 @@ export class BlingService {
 
     for (let attempt = 1; attempt <= retries; attempt++) {
       try {
+        await this.waitForRateLimit();
         response = await fetch(url, fetchOptions);
       } catch (error: any) {
         if ((error.message === 'fetch failed' || error.code === 'ECONNRESET') && attempt < retries) {
@@ -156,8 +196,11 @@ export class BlingService {
       }
 
       if (response.status === 429 && attempt < retries) {
-        console.warn(`[BlingService] Rate limit hit (429) on ${url}, backing off for 1.2s...`);
-        await new Promise(res => setTimeout(res, 1200));
+        const baseDelay = 1200 * attempt;
+        const jitter = Math.floor(Math.random() * 800);
+        const totalWait = baseDelay + jitter;
+        console.warn(`[BlingService] Rate limit hit (429) on ${url}, backing off for ${totalWait}ms...`);
+        await new Promise(res => setTimeout(res, totalWait));
         continue;
       }
 

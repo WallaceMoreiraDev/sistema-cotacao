@@ -22,9 +22,39 @@ export interface SmartDescriptionParams {
  * Regra 1: Geração Automática do Código Força Máxima (SKU)
  * O campo de código interno deve ser gerado automaticamente no padrão: FM-[CÓDIGO_DO_FORNECEDOR]
  */
-export function generateFMCode(supplierCode?: string): string {
-  if (!supplierCode || supplierCode.trim() === '') return '';
-  return `FM-${supplierCode.trim().toUpperCase()}`;
+export function generateFMCode(params: SmartDescriptionParams): string {
+  const initial = (params.category || '').trim().charAt(0).toUpperCase();
+  let baseCode = '';
+
+  if (params.supplierCode && params.supplierCode.trim() !== '') {
+    baseCode = `FM-${initial}${params.supplierCode.trim().toUpperCase()}`;
+  } else {
+    // Auto-generate if missing
+    let measStr = '';
+    if (params.measurements) {
+      const { innerDiameter, outerDiameter, height1, height2, thickness, cs } = params.measurements;
+      // We concatenate them in a standard order, ignoring empty ones.
+      const order = [innerDiameter, outerDiameter, height1, height2, thickness, cs];
+      for (const val of order) {
+        if (val !== undefined && val !== null && val !== '') {
+          // Keep exactly what the user typed (including trailing zeros), just removing dots/commas
+          measStr += val.toString().trim().replace(/[.,]/g, '');
+        }
+      }
+    }
+    if (!initial && !measStr) return '';
+    baseCode = `FM-${initial}${measStr}`;
+  }
+
+  // Append Brand Suffix (e.g. -AC)
+  if (params.brand && params.brand.trim() !== '') {
+    const b = params.brand.trim().toUpperCase();
+    const first = b.charAt(0);
+    const last = b.length > 1 ? b.charAt(b.length - 1) : '';
+    baseCode += `-${first}${last}`;
+  }
+
+  return baseCode;
 }
 
 /**
@@ -69,15 +99,15 @@ export function buildSmartDescription(params: SmartDescriptionParams): string {
   if (meas) parts.push(meas);
   
   if (params.partType) parts.push(params.partType.toUpperCase().trim());
-  if (params.supplierCode) parts.push(params.supplierCode.toUpperCase().trim());
+  
+  const generatedCode = generateFMCode(params);
+  if (generatedCode) {
+    parts.push(generatedCode.replace('FM-', ''));
+  }
+
   if (params.parkerOemCode) parts.push(params.parkerOemCode.toUpperCase().trim());
   
-  if (params.brand && params.brand.trim() !== '') {
-    const b = params.brand.trim().toUpperCase();
-    const first = b.charAt(0);
-    const last = b.length > 1 ? b.charAt(b.length - 1) : '';
-    parts.push(`-${first}${last}`);
-  }
+  // Note: Brand suffix is already included at the end of generatedCode!
 
   // Remove empty spaces and join
   return parts.filter(Boolean).join(' ');

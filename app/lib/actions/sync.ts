@@ -237,6 +237,9 @@ export async function syncBlingStockAction() {
       const chunkIds = blingIds.slice(i, i + chunkSize);
 
       const balances = await BlingService.getStockBalancesForProducts(chunkIds);
+      
+      // Rate limit protection
+      await new Promise(res => setTimeout(res, 350));
 
       for (const bal of balances) {
         const blingProductId = bal.produto?.id?.toString();
@@ -371,6 +374,9 @@ export async function syncSuppliersFromHardcodedListAction() {
     let updatedCount = 0;
 
     for (const sup of suppliersToSync) {
+      // Rate limit protection
+      await new Promise(res => setTimeout(res, 350));
+
       // Buscar o fornecedor atualizado direto do Bling
       const contactFromBling = await BlingService.getContact(sup.bling_id.toString());
       
