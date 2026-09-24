@@ -94,6 +94,7 @@ export function extractBrandFromName(name: string): string | null {
   if (upper.match(/- ?L$/)) return 'L';
   if (upper.match(/- ?HBY$/) || upper.match(/\bHBY\b/)) return 'HBY';
   if (upper.match(/- ?S$/)) return 'S';
+  if (upper.match(/- ?NK$/) || upper.match(/\bNAK\b/) || upper.match(/\bNK\b/)) return 'NAK';
   
   // Known inline words
   if (upper.match(/\bNOK\b/)) return 'NOK';
