@@ -144,7 +144,7 @@ export async function getProtocolByIdAction(id: string): Promise<{ success: bool
 
     // Auto-patch zero prices for 'estoque' items
     if (itemsData && itemsData.length > 0) {
-      const zeroItems = itemsData.filter(i => i.type === 'estoque' && (!i.sale_price || i.sale_price === 0));
+      const zeroItems = itemsData.filter(i => i.type === 'estoque' && (!i.sale_price || i.sale_price === 0 || !i.unit_price || i.unit_price === 0 || !i.cost_price || i.cost_price === 0));
       if (zeroItems.length > 0) {
         const identifiers = zeroItems.map(i => i.code || i.name).filter(Boolean);
         if (identifiers.length > 0) {
@@ -160,7 +160,9 @@ export async function getProtocolByIdAction(id: string): Promise<{ success: bool
               if (stockMatch && stockMatch.cost_price > 0) {
                 item.cost_price = stockMatch.cost_price;
                 item.unit_price = stockMatch.cost_price;
-                item.sale_price = stockMatch.cost_price * 1.7;
+                if (!item.sale_price || item.sale_price === 0) {
+                   item.sale_price = stockMatch.cost_price * (1 + (item.markup_percent || 70) / 100);
+                }
                 
                 await supabase.from('protocol_items').update({
                   cost_price: item.cost_price,
