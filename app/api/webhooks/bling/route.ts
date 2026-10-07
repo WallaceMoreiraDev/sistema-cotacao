@@ -159,6 +159,7 @@ async function processProductWebhook(blingId: string | number) {
 
     // Tenta mapear o fornecedor do Bling buscando diretamente o vínculo
     let supplierId = null;
+    let supplierCostPrice: number | null = null;
     const productSuppliers = await BlingService.getProductSuppliers(blingId);
     let linkedFornecedor = null;
     
@@ -166,6 +167,7 @@ async function processProductWebhook(blingId: string | number) {
       if (link.fornecedor) {
         if (!linkedFornecedor || link.padrao) {
           linkedFornecedor = link.fornecedor;
+          if (link.precoCusto) supplierCostPrice = parseFloat(link.precoCusto);
         }
       }
     }
@@ -207,7 +209,6 @@ async function processProductWebhook(blingId: string | number) {
       name,
       sku: code,
       code,
-      cost_price: price,
       stock: currentStock,
       bling_id: blingId.toString(),
       category: categoryName,
@@ -221,7 +222,19 @@ async function processProductWebhook(blingId: string | number) {
       updated_at: new Date().toISOString()
     };
 
-    const { data: existing } = await supabase.from('stock_products').select('id').eq('bling_id', blingId).single();
+    const { data: existing } = await supabase.from('stock_products').select('id, cost_price').eq('bling_id', blingId).single();
+    
+    const fallbackCost = parseFloat(product.precoCusto || '0');
+    if (supplierCostPrice && supplierCostPrice > 0) {
+      payload.cost_price = supplierCostPrice;
+    } else if (fallbackCost > 0) {
+      payload.cost_price = fallbackCost;
+    } else if (existing && existing.cost_price !== null && existing.cost_price !== undefined) {
+      payload.cost_price = existing.cost_price;
+    } else {
+      payload.cost_price = 0;
+    }
+
     if (existing) {
       await supabase.from('stock_products').update(payload).eq('id', existing.id);
       console.log(`Produto atualizado via Webhook: ${name}`);
