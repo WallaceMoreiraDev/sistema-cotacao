@@ -27,7 +27,12 @@ export function generateFMCode(params: SmartDescriptionParams): string {
   let baseCode = '';
 
   if (params.supplierCode && params.supplierCode.trim() !== '') {
-    baseCode = `FM-${initial}${params.supplierCode.trim().toUpperCase()}`;
+    const supCode = params.supplierCode.trim().toUpperCase();
+    if (initial && supCode.startsWith(initial)) {
+      baseCode = `FM-${supCode}`;
+    } else {
+      baseCode = `FM-${initial}${supCode}`;
+    }
   } else {
     // Auto-generate if missing
     let measStr = '';

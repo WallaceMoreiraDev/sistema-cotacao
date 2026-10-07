@@ -142,6 +142,38 @@ export async function getProtocolByIdAction(id: string): Promise<{ success: bool
       .select('*')
       .eq('protocol_id', id);
 
+    // Auto-patch zero prices for 'estoque' items
+    if (itemsData && itemsData.length > 0) {
+      const zeroItems = itemsData.filter(i => i.type === 'estoque' && (!i.sale_price || i.sale_price === 0));
+      if (zeroItems.length > 0) {
+        const identifiers = zeroItems.map(i => i.code || i.name).filter(Boolean);
+        if (identifiers.length > 0) {
+          const { data: stockData } = await supabase
+            .from('stock_products')
+            .select('sku, code, name, cost_price')
+            .or(`code.in.(${identifiers.map(i => `"${i}"`).join(',')}),sku.in.(${identifiers.map(i => `"${i}"`).join(',')}),name.in.(${identifiers.map(i => `"${i}"`).join(',')})`);
+            
+          if (stockData && stockData.length > 0) {
+            for (const item of zeroItems) {
+              const identifier = item.code || item.name;
+              const stockMatch = stockData.find(s => s.code === identifier || s.sku === identifier || s.name === identifier);
+              if (stockMatch && stockMatch.cost_price > 0) {
+                item.cost_price = stockMatch.cost_price;
+                item.unit_price = stockMatch.cost_price;
+                item.sale_price = stockMatch.cost_price * 1.7;
+                
+                await supabase.from('protocol_items').update({
+                  cost_price: item.cost_price,
+                  unit_price: item.unit_price,
+                  sale_price: item.sale_price
+                }).eq('id', item.id);
+              }
+            }
+          }
+        }
+      }
+    }
+
     const protocol = mapRowsToProtocol(protoRow, itemsData || []);
     return { success: true, data: protocol };
   } catch (err: any) {

@@ -30,6 +30,17 @@ export function ModalEditarItem({
         if (matchedFamily) extractedCategory = matchedFamily.name;
       }
 
+      let extractedCode = item.code ? item.code.replace('FM-', '') : '';
+      if (extractedCode && item.brand) {
+        const b = item.brand.trim().toUpperCase();
+        const first = b.charAt(0);
+        const last = b.length > 1 ? b.charAt(b.length - 1) : '';
+        const suffix = `-${first}${last}`;
+        if (extractedCode.endsWith(suffix)) {
+          extractedCode = extractedCode.slice(0, -suffix.length);
+        }
+      }
+
       setForm({
         category: extractedCategory,
         brand: item.brand || '',
@@ -38,7 +49,7 @@ export function ModalEditarItem({
         observation: item.observation || '',
         ignoreStock: false,
         partType: item.part_type || '',
-        supplierCode: item.code ? item.code.replace('FM-', '') : '', // reverse the FM- prefix if any
+        supplierCode: extractedCode,
         parkerCode: item.parker_code || '',
         oemCode: item.oem_code || '',
         measurements: {
@@ -85,7 +96,7 @@ export function ModalEditarItem({
       name: previewName || form.category,
       category: form.category,
       brand: form.brand,
-      quantity: Number(form.quantity),
+      quantity: Number(String(form.quantity).replace(',', '.')),
       observation: form.observation,
       part_type: form.partType,
       code: item.type === 'a_cotar' 
@@ -95,7 +106,7 @@ export function ModalEditarItem({
       oem_code: form.oemCode || item.oem_code || item.oem,
       description: form.description || item.description,
       measurements: {
-        ...item.measurements, // preserve excludeFromPurchasing etc
+        ...(item.measurements || {}), // preserve excludeFromPurchasing etc
         innerDiameter: form.measurements.innerDiameter ? Number(form.measurements.innerDiameter.replace(',', '.')) : undefined,
         outerDiameter: form.measurements.outerDiameter ? Number(form.measurements.outerDiameter.replace(',', '.')) : undefined,
         height1: form.measurements.height1 ? Number(form.measurements.height1.replace(',', '.')) : undefined,

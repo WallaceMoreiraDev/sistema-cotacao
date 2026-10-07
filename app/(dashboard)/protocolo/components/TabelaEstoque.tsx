@@ -93,7 +93,7 @@ export function TabelaEstoque({ items, updateQuantity, removeItem, getFreeStock,
                         step="any"
                         value={item.quantity}
                         onChange={(e) => {
-                          const val = parseFloat(e.target.value);
+                          const val = parseFloat(e.target.value.replace(',', '.'));
                           if (isNaN(val) || val <= 0) return;
                           
                           const identifier = item.code || item.oem || item.name;
@@ -219,7 +219,7 @@ export function TabelaEstoque({ items, updateQuantity, removeItem, getFreeStock,
                       step="any"
                       value={item.quantity}
                       onChange={(e) => {
-                        const val = parseFloat(e.target.value);
+                        const val = parseFloat(e.target.value.replace(',', '.'));
                         if (isNaN(val) || val <= 0) return;
                         
                         const identifier = item.code || item.oem || item.name;
