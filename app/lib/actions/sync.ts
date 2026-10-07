@@ -337,73 +337,127 @@ export async function syncSuppliersFromHardcodedListAction() {
   // This one only loops 17 items, so it's perfectly safe and no need to paginate
   try {
     const supabase = await createClient();
-    const suppliersToSync = [
-      { bling_id: 18166979175, type: 'Fornecedor Original', name: 'USINA VEDACOES E ACESSORIOS INDUSTRIAIS LTDA' },
-      { bling_id: 18166979682, type: 'Fornecedor Original', name: 'SP SEALS DISTRIBUIDORA LTDA' },
-      { bling_id: 18166981906, type: 'Fornecedor Original', name: 'RIO PRETO DISTRIBUIDORA DE VEDACOES LTDA' },
-      { bling_id: 18166984492, type: 'Fornecedor Original', name: 'TECVEDACOES COMERCIO DE VEDACOES E ACESSORIOS INDUSTRIAIS LT' },
-      { bling_id: 18166984588, type: 'Mercado Local', name: 'VED PIRA COM.DE VEDACOES HIDRAULICAS E PNEUMATICAS LTDA ME' },
-      { bling_id: 18166984689, type: 'Fornecedor Original', name: 'SKL DISTRIBUIDORA DE VEDACOES INDUSTRIAIS LTDA' },
-      { bling_id: 18180417442, type: 'Mercado Local', name: 'ZOTELLI COM VEDACOES HIDRAULICAS' },
-      { bling_id: 18180417930, type: 'Fornecedor Original', name: 'PARKITS VEDACOES HIDRAULICAS E PNEUMATICAS LTDA' },
-      { bling_id: 18219032503, type: 'Mercado Local', name: 'REAL VEDACOES INDUSTRIA E COMERCIO LTDA' },
-      { bling_id: 18221954746, type: 'Mercado Local', name: 'MFC DISTRIBUIDORA HIDRAULICA LTDA' },
-      { bling_id: 18240304442, type: 'Fornecedor Original', name: 'SIPPEL SUPRIMENTOS E ACESSORIOS IND LTDA' },
-      { bling_id: 18268385717, type: 'Fornecedor Original', name: 'LIBEL COMERCIO DE COMPONENTES DE VEDACAO LTDA.' },
-      { bling_id: 18278746092, type: 'Fornecedor Original', name: 'SKS USINAGEM E VEDACOES HIDRAULICA LTDA' },
-      { bling_id: 18278941418, type: 'Fornecedor Original', name: 'NORD RETENTORES LTDA' },
-      { bling_id: 18287198560, type: 'Fornecedor Original', name: 'CENTER SEALS- COMERCIO DE VEDACOES LTDA' },
-      { bling_id: 18287198687, type: 'Fornecedor Original', name: 'Comercio de Polimeros Industriais do Brasil Copolbra Ltda' },
-      { bling_id: 18309603230, type: 'Fornecedor Original', name: 'PK2 VEDACOES COMERCIO DE BORRACHAS E PLASTICOS LTDA' },
-      { bling_id: 18241543511, type: 'Fornecedor Original', name: 'REAL SEALS COMERCIO DE VEDACOES LTDA' },
-    ];
+    
+    // Map of known suppliers to preserve their original types
+    const knownSuppliersTypeMap = new Map([
+      [18166979175, 'Fornecedor Original'],
+      [18166979682, 'Fornecedor Original'],
+      [18166981906, 'Fornecedor Original'],
+      [18166984492, 'Fornecedor Original'],
+      [18166984588, 'Mercado Local'],
+      [18166984689, 'Fornecedor Original'],
+      [18180417442, 'Mercado Local'],
+      [18180417930, 'Fornecedor Original'],
+      [18219032503, 'Mercado Local'],
+      [18221954746, 'Mercado Local'],
+      [18240304442, 'Fornecedor Original'],
+      [18268385717, 'Fornecedor Original'],
+      [18278746092, 'Fornecedor Original'],
+      [18278941418, 'Fornecedor Original'],
+      [18287198560, 'Fornecedor Original'],
+      [18287198687, 'Fornecedor Original'],
+      [18309603230, 'Fornecedor Original'],
+      [18241543511, 'Fornecedor Original'],
+    ]);
 
     let createdCount = 0;
     let updatedCount = 0;
+    
+    // Use a Map to prevent duplicate IDs in the same upsert batch
+    const upsertMap = new Map();
+    // Keep track of processed bling ids to avoid processing same contact multiple times across different filters
+    const processedBlingIds = new Set<string>();
 
-    const blingIds = suppliersToSync.map(s => s.bling_id);
-    const { data: existingList } = await supabase.from('suppliers').select('id, bling_id').in('bling_id', blingIds);
-    const existingMap = new Map();
+    const { data: existingList } = await supabase.from('suppliers').select('id, bling_id, name');
+    const existingMapByBlingId = new Map();
+    const existingMapByName = new Map();
     if (existingList) {
-      existingList.forEach(e => existingMap.set(e.bling_id, e.id));
+      existingList.forEach((e: any) => {
+        if (e.bling_id) existingMapByBlingId.set(e.bling_id.toString(), e.id);
+        if (e.name) existingMapByName.set(e.name.trim().toLowerCase(), e.id);
+      });
     }
 
-    const upsertBatch = [];
-
-    for (const sup of suppliersToSync) {
-      await new Promise(res => setTimeout(res, 350));
-      const contactFromBling = await BlingService.getContact(sup.bling_id.toString());
-      if (contactFromBling && contactFromBling.nome) {
-        const supplierName = contactFromBling.nome;
-        const existingId = existingMap.get(sup.bling_id);
+    const processContacts = async (criterio?: number, idTipoContato?: number) => {
+      let page = 1;
+      let hasMore = true;
+      while (hasMore) {
+        const { data: contacts, hasMore: more } = await BlingService.getContactsPage(page, criterio, idTipoContato);
+        hasMore = more;
+        if (!contacts || contacts.length === 0) break;
         
-        if (existingId) {
-          upsertBatch.push({
-            id: existingId,
-            name: supplierName,
-            type: sup.type,
-            bling_id: sup.bling_id
-          });
-          updatedCount++;
-        } else {
-          upsertBatch.push({
-            id: `sup_${Date.now()}_${Math.floor(Math.random() * 10000)}`,
-            name: supplierName,
-            type: sup.type,
-            bling_id: sup.bling_id,
-            created_at: new Date().toISOString()
-          });
-          createdCount++;
+        for (const sup of contacts) {
+          const blingId = sup.id.toString();
+          if (processedBlingIds.has(blingId)) continue;
+          processedBlingIds.add(blingId);
+
+          const supplierName = sup.nome;
+          
+          let supType = 'Mercado Local';
+          if (knownSuppliersTypeMap.has(Number(blingId))) {
+            supType = knownSuppliersTypeMap.get(Number(blingId))!;
+          }
+
+          let existingId = existingMapByBlingId.get(blingId);
+          if (!existingId && supplierName) {
+             existingId = existingMapByName.get(supplierName.trim().toLowerCase());
+          }
+          
+          if (existingId) {
+            existingMapByBlingId.set(blingId, existingId);
+            existingMapByName.set(supplierName.trim().toLowerCase(), existingId);
+
+            if (!upsertMap.has(existingId)) updatedCount++;
+            
+            upsertMap.set(existingId, {
+              id: existingId,
+              name: supplierName,
+              type: supType,
+              bling_id: Number(blingId)
+            });
+          } else {
+            const newId = `sup_${Date.now()}_${Math.floor(Math.random() * 100000)}`;
+            existingMapByBlingId.set(blingId, newId);
+            existingMapByName.set(supplierName.trim().toLowerCase(), newId);
+
+            createdCount++;
+            
+            upsertMap.set(newId, {
+              id: newId,
+              name: supplierName,
+              type: supType,
+              bling_id: Number(blingId),
+              created_at: new Date().toISOString()
+            });
+          }
         }
+        
+        page++;
+        if (hasMore) await new Promise(res => setTimeout(res, 500));
+      }
+    };
+
+    // 1. Fetch using standard criterio=2 (Fornecedores)
+    await processContacts(2, undefined);
+
+    // 2. Fetch contact types and find any custom "Fornecedor" tags
+    const contactTypes = await BlingService.getContactTypes();
+    const fornecedorTypes = contactTypes.filter((t: any) => t.descricao && t.descricao.toLowerCase().includes('fornecedor'));
+    
+    for (const type of fornecedorTypes) {
+      await processContacts(undefined, type.id);
+    }
+
+    const upsertBatch = Array.from(upsertMap.values());
+    if (upsertBatch.length > 0) {
+      for (let i = 0; i < upsertBatch.length; i += 300) {
+        const chunk = upsertBatch.slice(i, i + 300);
+        const { error } = await supabase.from('suppliers').upsert(chunk, { onConflict: 'id' });
+        if (error) throw new Error('Erro ao salvar no banco: ' + error.message);
       }
     }
 
-    if (upsertBatch.length > 0) {
-      const { error } = await supabase.from('suppliers').upsert(upsertBatch, { onConflict: 'id' });
-      if (error) throw new Error('Erro ao salvar no banco: ' + error.message);
-    }
-
-    return { success: true, message: `Fornecedores base sincronizados: ${createdCount} criados, ${updatedCount} atualizados.` };
+    return { success: true, message: `Fornecedores sincronizados: ${createdCount} criados, ${updatedCount} atualizados.` };
   } catch (err: any) {
     console.error('syncSuppliersFromHardcodedListAction error:', err);
     return { success: false, error: err.message };

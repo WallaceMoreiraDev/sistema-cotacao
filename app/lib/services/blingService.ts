@@ -342,14 +342,28 @@ export class BlingService {
   /**
    * Fetch all contacts (clients/suppliers) from Bling
    */
-  static async getContactsPage(page: number = 1) {
-    const response = await this.request(`/contatos?pagina=${page}&limite=100`);
+  static async getContactsPage(page: number = 1, criterio?: number, idTipoContato?: number) {
+    let url = `/contatos?pagina=${page}&limite=100`;
+    if (criterio) url += `&criterio=${criterio}`;
+    if (idTipoContato) url += `&idTipoContato=${idTipoContato}`;
+    
+    const response = await this.request(url);
     if (!response.ok) {
       throw new Error('Falha ao buscar contatos do Bling');
     }
     const result = await response.json();
     const data = result.data || [];
     return { data, hasMore: data.length === 100 };
+  }
+
+  /**
+   * Fetch contact types
+   */
+  static async getContactTypes() {
+    const response = await this.request('/contatos/tipos');
+    if (!response.ok) return [];
+    const result = await response.json();
+    return result.data || [];
   }
 
   /**
