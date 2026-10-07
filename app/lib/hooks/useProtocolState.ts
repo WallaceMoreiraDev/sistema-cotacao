@@ -434,7 +434,7 @@ export function useProtocolState(
   }, []);
 
   const updateEstoqueItemQuantity = useCallback((id: string, newQty: number) => {
-    if (newQty < 1 || isNaN(newQty)) return;
+    if (newQty <= 0 || isNaN(newQty)) return;
     setEstoqueItems(prev => prev.map(i => (i.id === id ? { ...i, quantity: newQty } : i)));
   }, []);
 
@@ -579,7 +579,7 @@ export function useProtocolState(
   }, []);
 
   const updateACotarItemQuantity = useCallback((id: string, newQty: number) => {
-    if (newQty < 1 || isNaN(newQty)) return;
+    if (newQty <= 0 || isNaN(newQty)) return;
     setACotarItems(prev => prev.map(i => (i.id === id ? { ...i, quantity: newQty } : i)));
   }, []);
 

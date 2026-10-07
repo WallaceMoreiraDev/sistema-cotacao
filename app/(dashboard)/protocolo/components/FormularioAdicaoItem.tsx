@@ -330,6 +330,7 @@ export function FormularioAdicaoItem({
                             )}
 
                             {product.brand && <p className="font-semibold text-amber-600 mt-1">Marca: {product.brand}</p>}
+                            {product.measurements?.location && <p className="font-semibold text-indigo-600 mt-1">Localização: {product.measurements.location}</p>}
                           </div>
                         </div>
                         <div className="flex flex-col items-end gap-1">

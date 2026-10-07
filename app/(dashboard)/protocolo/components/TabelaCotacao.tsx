@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import type { ProtocolItem, StockProduct } from '../../../lib/types/database';
 import type { SupplierRow } from '../../../lib/actions/suppliers';
 import { formatCurrency, formatMeasurement, areItemsMatching } from '../../../lib/utils/protocolFormatters';
@@ -23,6 +23,57 @@ interface TabelaCotacaoProps {
   stockProducts?: StockProduct[];
   onEditItem?: (item: ProtocolItem) => void;
 }
+
+const DecimalInput = ({ value, onChange, placeholder, disabled, className }: any) => {
+  const [localValue, setLocalValue] = useState(value !== undefined && value !== null ? value.toString() : '');
+
+  useEffect(() => {
+    if (value !== undefined && value !== null) {
+      const valStr = value.toString();
+      const localFloat = parseFloat(localValue.replace(',', '.'));
+      const valFloat = parseFloat(valStr);
+      
+      if (isNaN(localFloat) || localFloat !== valFloat) {
+        setLocalValue(valStr);
+      }
+    } else {
+      setLocalValue('');
+    }
+  }, [value]);
+
+  const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value.replace(',', '.');
+    if (/^\d*\.?\d*$/.test(val)) {
+      setLocalValue(val);
+      const num = parseFloat(val);
+      if (!isNaN(num)) {
+        onChange(num);
+      } else if (val === '') {
+        onChange(0);
+      }
+    }
+  };
+
+  const handleBlur = () => {
+    if (localValue === '0.' || localValue === '.') {
+      setLocalValue('0');
+      onChange(0);
+    }
+  };
+
+  return (
+    <input
+      type="text"
+      inputMode="decimal"
+      placeholder={placeholder}
+      value={localValue.replace('.', ',')}
+      onChange={handleChange}
+      onBlur={handleBlur}
+      disabled={disabled}
+      className={className}
+    />
+  );
+};
 
 export function TabelaCotacao({
   items,
@@ -179,12 +230,9 @@ export function TabelaCotacao({
                   <div className="flex items-center justify-between md:justify-end gap-4 min-w-[120px]">
                     <div className="flex items-center gap-2">
                       <label className="text-[10px] font-bold text-slate-500 uppercase tracking-wider">QTD</label>
-                      <input
-                        type="number"
-                        min="0.001"
-                        step="any"
+                      <DecimalInput
                         value={item.quantity}
-                        onChange={(e) => updateQuantity(item.id, Number(e.target.value))}
+                        onChange={(num: number) => updateQuantity(item.id, num)}
                         disabled={isViewing || isPurchased}
                         className="w-16 rounded border border-slate-300 py-1 px-2 text-sm text-center text-slate-900 focus:border-emerald-500 focus:ring-emerald-500 disabled:opacity-50 disabled:bg-slate-100"
                       />
@@ -240,11 +288,10 @@ export function TabelaCotacao({
                               </button>
                             )}
                           </div>
-                          <input
-                            type="number"
+                          <DecimalInput
                             placeholder="R$ 0,00"
                             value={item.supplierCosts?.[sup.id] || ''}
-                            onChange={(e) => updateSupplierCost(item.id, String(sup.id), parseFloat(e.target.value))}
+                            onChange={(num: number) => updateSupplierCost(item.id, String(sup.id), num)}
                             disabled={isViewing || isPurchased}
                             className={`w-full rounded border py-1.5 px-2 text-sm text-center transition-colors focus:ring-1 focus:outline-none ${isCheapest || item.forcedSupplierId === String(sup.id) ? 'border-emerald-500 bg-emerald-50 text-emerald-900 shadow-sm ring-emerald-500' : 'border-slate-200 text-slate-900 bg-white'} disabled:opacity-60`}
                           />

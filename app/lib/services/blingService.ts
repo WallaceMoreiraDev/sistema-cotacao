@@ -31,9 +31,18 @@ export class BlingService {
     }
   }
 
+  private static cachedSettings: any = null;
+  private static cachedSettingsTime: number = 0;
+
   private static async getSettings() {
+    const now = Date.now();
+    if (this.cachedSettings && (now - this.cachedSettingsTime < 60000)) {
+      return this.cachedSettings;
+    }
     const { success, data } = await getSystemSettingsAction();
     if (!success || !data) throw new Error('Não foi possível carregar as configurações do sistema.');
+    this.cachedSettings = data;
+    this.cachedSettingsTime = now;
     return data;
   }
 

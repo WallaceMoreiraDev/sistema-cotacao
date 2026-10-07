@@ -355,32 +355,52 @@ export async function syncSuppliersFromHardcodedListAction() {
       { bling_id: 18287198560, type: 'Fornecedor Original', name: 'CENTER SEALS- COMERCIO DE VEDACOES LTDA' },
       { bling_id: 18287198687, type: 'Fornecedor Original', name: 'Comercio de Polimeros Industriais do Brasil Copolbra Ltda' },
       { bling_id: 18309603230, type: 'Fornecedor Original', name: 'PK2 VEDACOES COMERCIO DE BORRACHAS E PLASTICOS LTDA' },
+      { bling_id: 18241543511, type: 'Fornecedor Original', name: 'REAL SEALS COMERCIO DE VEDACOES LTDA' },
     ];
 
     let createdCount = 0;
     let updatedCount = 0;
+
+    const blingIds = suppliersToSync.map(s => s.bling_id);
+    const { data: existingList } = await supabase.from('suppliers').select('id, bling_id').in('bling_id', blingIds);
+    const existingMap = new Map();
+    if (existingList) {
+      existingList.forEach(e => existingMap.set(e.bling_id, e.id));
+    }
+
+    const upsertBatch = [];
 
     for (const sup of suppliersToSync) {
       await new Promise(res => setTimeout(res, 350));
       const contactFromBling = await BlingService.getContact(sup.bling_id.toString());
       if (contactFromBling && contactFromBling.nome) {
         const supplierName = contactFromBling.nome;
-        const { data: existing } = await supabase.from('suppliers').select('id').eq('bling_id', sup.bling_id).single();
-        if (existing) {
-          const { error } = await supabase.from('suppliers').update({ name: supplierName, type: sup.type }).eq('id', existing.id);
-          if (!error) updatedCount++;
+        const existingId = existingMap.get(sup.bling_id);
+        
+        if (existingId) {
+          upsertBatch.push({
+            id: existingId,
+            name: supplierName,
+            type: sup.type,
+            bling_id: sup.bling_id
+          });
+          updatedCount++;
         } else {
-          const payload = {
+          upsertBatch.push({
             id: `sup_${Date.now()}_${Math.floor(Math.random() * 10000)}`,
             name: supplierName,
             type: sup.type,
             bling_id: sup.bling_id,
             created_at: new Date().toISOString()
-          };
-          const { error } = await supabase.from('suppliers').insert([payload]);
-          if (!error) createdCount++;
+          });
+          createdCount++;
         }
       }
+    }
+
+    if (upsertBatch.length > 0) {
+      const { error } = await supabase.from('suppliers').upsert(upsertBatch, { onConflict: 'id' });
+      if (error) throw new Error('Erro ao salvar no banco: ' + error.message);
     }
 
     return { success: true, message: `Fornecedores base sincronizados: ${createdCount} criados, ${updatedCount} atualizados.` };
