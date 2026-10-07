@@ -33,25 +33,29 @@ export function formatCpfMask(val: string) {
 }
 
 export function areItemsMatching(
-  itemA: { name?: string; code?: string; productId?: string; brand?: string; measurements?: any },
-  itemB: { name?: string; code?: string; productId?: string; brand?: string; measurements?: any }
+  itemA: { id?: string | number; sku?: string; name?: string; code?: string; productId?: string; brand?: string; measurements?: any },
+  itemB: { id?: string | number; sku?: string; name?: string; code?: string; productId?: string; brand?: string; measurements?: any }
 ): boolean {
-  // 1. Match exato por productId
-  if (itemA.productId && itemB.productId && String(itemA.productId) === String(itemB.productId)) {
+  // 1. Match exato por productId ou id (útil quando comparamos ProtocolItem com StockProduct)
+  const idA = itemA.productId || itemA.id;
+  const idB = itemB.productId || itemB.id;
+  if (idA && idB && String(idA) === String(idB)) {
     return true;
   }
 
-  // 2. Nome é obrigatório e deve bater
+  // 2. Match exato por código/SKU (Se tiverem códigos idênticos e não vazios, são o mesmo produto)
+  const codeA = String(itemA.code || itemA.sku || '').trim().toLowerCase();
+  const codeB = String(itemB.code || itemB.sku || '').trim().toLowerCase();
+  if (codeA && codeB && codeA === codeB) {
+    return true;
+  }
+
+  // 3. Nome é obrigatório e deve bater, se os códigos não bateram
   if (String(itemA.name || '').trim().toLowerCase() !== String(itemB.name || '').trim().toLowerCase()) {
     return false;
   }
 
-  // 3. Código só bloqueia se AMBOS têm código e diferem
-  if (itemA.code && itemB.code && String(itemA.code).trim().toLowerCase() !== String(itemB.code).trim().toLowerCase()) {
-    return false;
-  }
-
-  // 4. Marca só bloqueia se AMBOS têm marca e diferem (um sem marca não bloqueia o match)
+  // 4. Marca só bloqueia se AMBOS têm marca e diferem
   const brandA = String(itemA.brand || '').trim().toLowerCase();
   const brandB = String(itemB.brand || '').trim().toLowerCase();
   if (brandA && brandB && brandA !== brandB) {
@@ -75,7 +79,7 @@ export function areItemsMatching(
 }
 
 
-export function countUniqueProtocolItems(items: { name?: string; code?: string; productId?: string; brand?: string; measurements?: any }[] | undefined): number {
+export function countUniqueProtocolItems(items: { id?: string | number; sku?: string; name?: string; code?: string; productId?: string; brand?: string; measurements?: any }[] | undefined): number {
   if (!items || !Array.isArray(items) || items.length === 0) return 0;
   
   const uniqueItems: any[] = [];

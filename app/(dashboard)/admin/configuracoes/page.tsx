@@ -2,12 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { getSystemSettingsAction, updateSystemSettingsAction } from '../../../lib/actions/admin';
-import {
-  syncBlingCategoriesAction,
-  syncBlingProductsAction,
-  syncBlingStockAction,
-  syncBlingContactsAction,
-} from '../../../lib/actions/sync';
+import { useBlingSync } from '../../../lib/hooks/useBlingSync';
 import type { SystemSettings } from '../../../lib/types/database';
 import toast from 'react-hot-toast';
 
@@ -15,6 +10,7 @@ export default function SettingsPage() {
   const [settings, setSettings] = useState<SystemSettings>({ markup_original: 70, markup_local: 30 });
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const { syncProgress, syncCategories, syncProducts, syncStock, syncContacts } = useBlingSync();
 
   useEffect(() => {
     async function loadSettings() {
@@ -215,55 +211,53 @@ export default function SettingsPage() {
                       </p>
 
                       {settings.bling_access_token && (
-                        <div className="flex gap-2">
-                          <button
-                            type="button"
-                            onClick={async () => {
-                              toast.loading('Sincronizando Categorias...', { id: 'syncCat' });
-                              const res = await syncBlingCategoriesAction();
-                              if (res.success) toast.success(res.message || 'Sucesso', { id: 'syncCat' });
-                              else toast.error(res.error ? String(res.error) : 'Erro ao sincronizar', { id: 'syncCat' });
-                            }}
-                            className="rounded-lg bg-white border border-blue-200 px-4 py-2 text-xs font-bold text-blue-700 hover:bg-blue-50 transition-colors shadow-sm"
-                          >
-                            Puxar Categorias
-                          </button>
-                          <button
-                            type="button"
-                            onClick={async () => {
-                              toast.loading('Sincronizando Produtos...', { id: 'syncProd' });
-                              const res = await syncBlingProductsAction();
-                              if (res.success) toast.success(res.message || 'Sucesso', { id: 'syncProd' });
-                              else toast.error(res.error ? String(res.error) : 'Erro ao sincronizar', { id: 'syncProd' });
-                            }}
-                            className="rounded-lg bg-blue-600 border border-blue-700 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700 transition-colors shadow-sm"
-                          >
-                            Puxar Produtos
-                          </button>
-                          <button
-                            type="button"
-                            onClick={async () => {
-                              toast.loading('Sincronizando Estoques...', { id: 'syncStock' });
-                              const res = await syncBlingStockAction();
-                              if (res.success) toast.success(res.message || 'Sucesso', { id: 'syncStock' });
-                              else toast.error(res.error ? String(res.error) : 'Erro ao sincronizar', { id: 'syncStock' });
-                            }}
-                            className="rounded-lg bg-emerald-600 border border-emerald-700 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-700 transition-colors shadow-sm"
-                          >
-                            Sincronizar Estoque Físico
-                          </button>
-                          <button
-                            type="button"
-                            onClick={async () => {
-                              toast.loading('Sincronizando Clientes...', { id: 'syncContacts' });
-                              const res = await syncBlingContactsAction();
-                              if (res.success) toast.success(res.message || 'Sucesso', { id: 'syncContacts' });
-                              else toast.error(res.error ? String(res.error) : 'Erro ao sincronizar', { id: 'syncContacts' });
-                            }}
-                            className="rounded-lg bg-purple-600 border border-purple-700 px-4 py-2 text-xs font-bold text-white hover:bg-purple-700 transition-colors shadow-sm"
-                          >
-                            Puxar Clientes
-                          </button>
+                        <div className="flex flex-col gap-4 w-full">
+                          {syncProgress && (
+                            <div className="rounded-lg bg-blue-50 border border-blue-200 p-4 w-full flex items-center justify-between">
+                              <div className="flex items-center gap-3">
+                                <div className="h-5 w-5 animate-spin rounded-full border-2 border-blue-200 border-t-blue-600"></div>
+                                <div>
+                                  <p className="text-sm font-bold text-blue-900">{syncProgress.message}</p>
+                                  {syncProgress.subMessage && <p className="text-xs text-blue-700 mt-0.5">{syncProgress.subMessage}</p>}
+                                </div>
+                              </div>
+                            </div>
+                          )}
+
+                          <div className="flex flex-wrap gap-2">
+                            <button
+                              type="button"
+                              onClick={syncCategories}
+                              disabled={!!syncProgress}
+                              className="rounded-lg bg-white border border-blue-200 px-4 py-2 text-xs font-bold text-blue-700 hover:bg-blue-50 transition-colors shadow-sm disabled:opacity-50"
+                            >
+                              Puxar Categorias
+                            </button>
+                            <button
+                              type="button"
+                              onClick={syncProducts}
+                              disabled={!!syncProgress}
+                              className="rounded-lg bg-blue-600 border border-blue-700 px-4 py-2 text-xs font-bold text-white hover:bg-blue-700 transition-colors shadow-sm disabled:opacity-50"
+                            >
+                              Puxar Produtos
+                            </button>
+                            <button
+                              type="button"
+                              onClick={syncStock}
+                              disabled={!!syncProgress}
+                              className="rounded-lg bg-emerald-600 border border-emerald-700 px-4 py-2 text-xs font-bold text-white hover:bg-emerald-700 transition-colors shadow-sm disabled:opacity-50"
+                            >
+                              Sincronizar Estoque Físico
+                            </button>
+                            <button
+                              type="button"
+                              onClick={syncContacts}
+                              disabled={!!syncProgress}
+                              className="rounded-lg bg-purple-600 border border-purple-700 px-4 py-2 text-xs font-bold text-white hover:bg-purple-700 transition-colors shadow-sm disabled:opacity-50"
+                            >
+                              Puxar Clientes
+                            </button>
+                          </div>
                         </div>
                       )}
                     </div>

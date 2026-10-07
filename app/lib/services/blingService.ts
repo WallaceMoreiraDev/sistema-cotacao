@@ -215,94 +215,44 @@ export class BlingService {
   }
 
   /**
-   * Fetch all categories from Bling (returns all pages combined)
+   * Fetch a specific page of categories from Bling (100 per page)
    */
-  static async getAllCategories() {
-    let allCategories: any[] = [];
-    let page = 1;
-    let hasMore = true;
-
-    while (hasMore) {
-      const response = await this.request(`/categorias/produtos?pagina=${page}&limite=100`);
-      if (!response.ok) {
-        throw new Error('Falha ao buscar categorias do Bling');
-      }
-      const result = await response.json();
-      const data = result.data || [];
-
-      allCategories = allCategories.concat(data);
-
-      if (data.length < 100) {
-        hasMore = false;
-      } else {
-        page++;
-        // API rate limit protection (optional but recommended for loop)
-        await new Promise(res => setTimeout(res, 333));
-      }
+  static async getCategoriesPage(page: number = 1) {
+    const response = await this.request(`/categorias/produtos?pagina=${page}&limite=100`);
+    if (!response.ok) {
+      throw new Error('Falha ao buscar categorias do Bling');
     }
-
-    return allCategories;
+    const result = await response.json();
+    const data = result.data || [];
+    return { data, hasMore: data.length === 100 };
   }
 
   /**
-   * Fetch all products from Bling (returns all pages combined)
+   * Fetch a specific page of products from Bling (100 per page)
    */
-  static async getAllProducts() {
-    let allProducts: any[] = [];
-    let page = 1;
-    let hasMore = true;
-
-    while (hasMore) {
-      // We can also fetch stock inside the product if we pass specific params, but usually /produtos?criterio=5 (situacao=ativo) 
-      const response = await this.request(`/produtos?pagina=${page}&limite=100`);
-      if (!response.ok) {
-        throw new Error('Falha ao buscar produtos do Bling');
-      }
-      const result = await response.json();
-      const data = result.data || [];
-
-      allProducts = allProducts.concat(data);
-
-      if (data.length < 100) {
-        hasMore = false;
-      } else {
-        page++;
-        // API rate limit protection
-        await new Promise(res => setTimeout(res, 333));
-      }
+  static async getProductsPage(page: number = 1) {
+    // criterio=1 fetches only "Active" products
+    const response = await this.request(`/produtos?pagina=${page}&limite=100&criterio=1`);
+    if (!response.ok) {
+      throw new Error('Falha ao buscar produtos do Bling');
     }
-
-    return allProducts;
+    const result = await response.json();
+    const data = result.data || [];
+    return { data, hasMore: data.length === 100 };
   }
 
   /**
-   * Fetch all product-supplier links from Bling
+   * Fetch a specific page of product-supplier links from Bling
    */
-  static async getAllProductSuppliers() {
-    let allLinks: any[] = [];
-    let page = 1;
-    let hasMore = true;
-
-    while (hasMore) {
-      const response = await this.request(`/produtos/fornecedores?pagina=${page}&limite=100`);
-      if (!response.ok) {
-        console.error('Falha ao buscar fornecedores de produtos do Bling');
-        break;
-      }
-      const result = await response.json();
-      const data = result.data || [];
-
-      allLinks = allLinks.concat(data);
-
-      if (data.length < 100) {
-        hasMore = false;
-      } else {
-        page++;
-        await new Promise(res => setTimeout(res, 333));
-      }
+  static async getProductSuppliersPage(page: number = 1) {
+    const response = await this.request(`/produtos/fornecedores?pagina=${page}&limite=100`);
+    if (!response.ok) {
+      console.error('Falha ao buscar fornecedores de produtos do Bling');
+      return { data: [], hasMore: false };
     }
-
-    return allLinks;
+    const result = await response.json();
+    const data = result.data || [];
+    return { data, hasMore: data.length === 100 };
   }
 
   /**
@@ -383,30 +333,14 @@ export class BlingService {
   /**
    * Fetch all contacts (clients/suppliers) from Bling
    */
-  static async getAllContacts() {
-    let allContacts: any[] = [];
-    let page = 1;
-    let hasMore = true;
-
-    while (hasMore) {
-      const response = await this.request(`/contatos?pagina=${page}&limite=100`);
-      if (!response.ok) {
-        throw new Error('Falha ao buscar contatos do Bling');
-      }
-      const result = await response.json();
-      const data = result.data || [];
-
-      allContacts = allContacts.concat(data);
-
-      if (data.length < 100) {
-        hasMore = false;
-      } else {
-        page++;
-        await new Promise(res => setTimeout(res, 333));
-      }
+  static async getContactsPage(page: number = 1) {
+    const response = await this.request(`/contatos?pagina=${page}&limite=100`);
+    if (!response.ok) {
+      throw new Error('Falha ao buscar contatos do Bling');
     }
-
-    return allContacts;
+    const result = await response.json();
+    const data = result.data || [];
+    return { data, hasMore: data.length === 100 };
   }
 
   /**

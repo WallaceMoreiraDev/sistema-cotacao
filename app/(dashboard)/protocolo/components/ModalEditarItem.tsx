@@ -88,10 +88,12 @@ export function ModalEditarItem({
       quantity: Number(form.quantity),
       observation: form.observation,
       part_type: form.partType,
-      code: generateFMCode({ category: form.category, measurements: form.measurements, supplierCode: form.supplierCode, brand: form.brand }) || undefined,
-      parker_code: form.parkerCode,
-      oem_code: form.oemCode,
-      description: form.description,
+      code: item.type === 'a_cotar' 
+        ? (generateFMCode({ category: form.category, measurements: form.measurements, supplierCode: form.supplierCode, brand: form.brand }) || item.code || undefined) 
+        : item.code,
+      parker_code: form.parkerCode || item.parker_code,
+      oem_code: form.oemCode || item.oem_code || item.oem,
+      description: form.description || item.description,
       measurements: {
         ...item.measurements, // preserve excludeFromPurchasing etc
         innerDiameter: form.measurements.innerDiameter ? Number(form.measurements.innerDiameter.replace(',', '.')) : undefined,

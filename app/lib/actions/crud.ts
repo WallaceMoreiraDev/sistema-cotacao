@@ -327,7 +327,7 @@ export async function saveProtocolAction(protocol: Protocol, options?: { skipDif
           cost_price: item.costPrice ?? 0,
           type: item.type ?? 'estoque',
           status: item.status ?? 'pendente',
-          oem: item.oem_code || null,
+          oem: item.oem || item.oem_code || null,
           nickname: item.nickname || null,
           code: item.code || null,
           brand: item.brand || null,

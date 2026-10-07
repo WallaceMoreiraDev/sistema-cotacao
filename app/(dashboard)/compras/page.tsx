@@ -18,13 +18,10 @@ export default async function ComprasPage() {
     .select('id, name')
     .order('name');
 
-  // Fetch active protocols (not canceled, not finalized maybe? Wait, user might need to buy for finalized protocols)
-  // Let's exclude canceled.
-  const { data: protocols } = await supabase
-    .from('protocols')
-    .select('*')
-    .neq('status', 'cancelado')
-    .order('created_at', { ascending: false });
+  // Fetch active protocols with items using getProtocolsAction
+  const { getProtocolsAction } = await import('../../lib/actions/protocols');
+  const protocolsRes = await getProtocolsAction();
+  const protocols = (protocolsRes.data || []).filter(p => p.status !== 'cancelado');
 
   const { data: userRow } = await supabase
     .from('users')
