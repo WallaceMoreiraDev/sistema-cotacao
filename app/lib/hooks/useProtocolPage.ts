@@ -29,6 +29,7 @@ interface UseProtocolPageOptions {
   suppliers: any[];
   navigateAfterSave?: boolean;
   userRole?: string;
+  isLocked?: boolean;
 }
 
 export function useProtocolPage({
@@ -41,6 +42,7 @@ export function useProtocolPage({
   suppliers,
   navigateAfterSave = false,
   userRole,
+  isLocked = false,
 }: UseProtocolPageOptions) {
   const router = useRouter();
 
@@ -120,6 +122,9 @@ export function useProtocolPage({
 
   const queueSaveProtocol = useCallback((protocol: any, options?: { skipDiffLog?: boolean }) => {
     return new Promise<{ success: boolean; data?: any; error?: string }>((resolve, reject) => {
+      if (isLocked) {
+        return resolve({ success: false, error: 'Protocolo bloqueado.' });
+      }
       saveQueueRef.current = saveQueueRef.current.then(async () => {
         try {
           const res = await saveProtocolAction({ ...protocol, id: protocolIdRef.current }, options);
@@ -132,11 +137,17 @@ export function useProtocolPage({
         reject(e);
       });
     });
-  }, []);
+  }, [isLocked]);
 
   useEffect(() => {
     if (!isViewing) isDirtyRef.current = true;
   }, [allItems, clientName, protocolTitle, itemForm, isViewing, supplierFreights, priceTableId]);
+
+  useEffect(() => {
+    if (isLocked && !isViewing) {
+      setIsViewing(true);
+    }
+  }, [isLocked, isViewing]);
 
   useEffect(() => {
     if (isViewing || isFinalizing || isFinalizingRef.current) return;

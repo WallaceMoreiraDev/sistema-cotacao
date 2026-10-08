@@ -10,6 +10,7 @@ import type { Protocol, ProtocolItem } from '../../../lib/types/database';
 import { ItemFormState } from '../../../lib/config/protocolForm';
 import { useProtocolRealtime } from '../../../lib/hooks/useProtocolRealtime';
 import { useProtocolPage } from '../../../lib/hooks/useProtocolPage';
+import { useProtocolLock } from '../../../lib/hooks/useProtocolLock';
 import { useAuth } from '../../../context/AuthContext';
 import { HeaderProtocolo } from '../components/HeaderProtocolo';
 import { FormularioAdicaoItem } from '../components/FormularioAdicaoItem';
@@ -31,6 +32,7 @@ export default function ProtocolDetailPage() {
   const { stockProducts, stockLoading, registeredClients, clientsLoading } = useProtocolRealtime(
     !isNaN(Number(params?.id)) ? Number(params.id) : undefined
   );
+  const { isLocked, lockedBy } = useProtocolLock(params?.id);
   const [suppliers, setSuppliers] = useState<any[]>([]);
   const [sealFamilies, setSealFamilies] = useState<any[]>([]);
   const [priceTables, setPriceTables] = useState<any[]>([]);
@@ -77,6 +79,7 @@ export default function ProtocolDetailPage() {
     stockProducts,
     suppliers,
     userRole: user?.role,
+    isLocked,
   });
   useEffect(() => {
     if (params.id) {
@@ -132,7 +135,7 @@ export default function ProtocolDetailPage() {
           <span className="font-semibold text-slate-800">{protocolTitle || `Protocolo #${protocolIdRef.current}`}</span>
         </div>
         {isViewing ? (
-          <button onClick={() => setIsViewing(false)} className="inline-flex items-center gap-2 rounded-xl bg-[#F7C00C] px-4 py-2 font-bold text-slate-900 shadow-sm transition-all hover:bg-[#E8B600]">
+          <button onClick={() => !isLocked && setIsViewing(false)} disabled={isLocked} className={`inline-flex items-center gap-2 rounded-xl px-4 py-2 font-bold shadow-sm transition-all ${isLocked ? 'bg-slate-200 text-slate-400 cursor-not-allowed' : 'bg-[#F7C00C] text-slate-900 hover:bg-[#E8B600]'}`}>
             <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" /></svg>
             Editar Protocolo
           </button>
@@ -143,6 +146,16 @@ export default function ProtocolDetailPage() {
           </button>
         )}
       </nav>
+      {isLocked && (
+        <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-md flex items-center gap-3">
+          <svg className="h-5 w-5 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+          </svg>
+          <div className="text-red-700">
+            <strong>Protocolo Bloqueado:</strong> Este protocolo está sendo editado por <strong>{lockedBy}</strong>. Você não pode fazer alterações enquanto a outra pessoa estiver na página.
+          </div>
+        </div>
+      )}
       <HeaderProtocolo clientName={clientName} setClientName={setClientName}
         registeredClients={registeredClients} protocolTitle={protocolTitle}
         setProtocolTitle={setProtocolTitle} protocolStatus={protocolStatus}

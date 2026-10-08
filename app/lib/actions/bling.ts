@@ -107,6 +107,9 @@ export async function enviarParaBlingAction(protocolId: string | number): Promis
       // same SKU or create it. Bling enforces unique `codigo`, so blindly creating fails on re-sends.
       if (!blingProductId) {
         try {
+          // Delay explicitly before Bling API calls to avoid rate limit issues across processes
+          await new Promise(resolve => setTimeout(resolve, 600));
+          
           const fallbackCode = generateFMCode({ 
             category: item.category || '', 
             measurements: item.measurements, 
@@ -125,6 +128,10 @@ export async function enviarParaBlingAction(protocolId: string | number): Promis
           // 2) Create it only when it doesn't exist yet
           if (!blingProductId) {
             try {
+              if (productCode) {
+                // We just did a findProductByCode call above, so we delay again before create
+                await new Promise(resolve => setTimeout(resolve, 600));
+              }
               const newProd = await BlingService.createProduct({
                 nome: item.name,
                 codigo: productCode,
@@ -148,6 +155,7 @@ export async function enviarParaBlingAction(protocolId: string | number): Promis
             } catch (createErr) {
               // 3) Race/edge case: code got registered between lookup and creation → resolve by code
               if (productCode && BlingService.isDuplicateCodeError(createErr)) {
+                await new Promise(resolve => setTimeout(resolve, 600));
                 const existing = await BlingService.findProductByCode(productCode);
                 if (!existing) throw createErr;
                 blingProductId = existing.id;
@@ -180,6 +188,7 @@ export async function enviarParaBlingAction(protocolId: string | number): Promis
             if (bestSupplierId) {
               const { data: supData } = await supabase.from('suppliers').select('bling_id').eq('id', bestSupplierId).single();
               if (supData && supData.bling_id) {
+                await new Promise(resolve => setTimeout(resolve, 600));
                 await BlingService.addSupplierToProduct(blingProductId, supData.bling_id, bestCost);
               }
             }
