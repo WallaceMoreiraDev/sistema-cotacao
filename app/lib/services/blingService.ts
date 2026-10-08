@@ -2,6 +2,31 @@ import { getSystemSettingsAction, updateSystemSettingsAction } from '../actions/
 
 const BLING_API_BASE = 'https://api.bling.com.br/Api/v3';
 
+/**
+ * Error thrown by Bling API calls, keeping HTTP status and the parsed JSON body
+ * so callers can inspect validation details (e.g. `error.fields`).
+ */
+export class BlingApiError extends Error {
+  status: number;
+  body: any;
+
+  constructor(message: string, status: number, body: any) {
+    super(message);
+    this.name = 'BlingApiError';
+    this.status = status;
+    this.body = body;
+  }
+
+  /** Human-readable summary of Bling validation messages, when available. */
+  get readableMessage(): string {
+    const fields = this.body?.error?.fields;
+    if (Array.isArray(fields) && fields.length > 0) {
+      return fields.map((f: any) => f?.msg).filter(Boolean).join(' | ');
+    }
+    return this.body?.error?.description || this.body?.error?.message || this.message;
+  }
+}
+
 export class BlingService {
   private static refreshPromise: Promise<string> | null = null;
   private static lastRequestTime: number = 0;
@@ -377,11 +402,48 @@ export class BlingService {
 
     if (!response.ok) {
       const errText = await response.text();
-      throw new Error(`Falha ao criar produto no Bling: ${response.status} - ${errText}`);
+      let body: any = null;
+      try { body = JSON.parse(errText); } catch { /* non-JSON body */ }
+      throw new BlingApiError(`Falha ao criar produto no Bling: ${response.status} - ${errText}`, response.status, body);
     }
 
     const result = await response.json();
     return result.data;
+  }
+
+  /**
+   * Finds a product in Bling by its exact SKU code (`codigo`).
+   * Searches all situations (criterio=5) because Bling enforces code uniqueness
+   * across active and inactive products. Prefers an active match.
+   * Returns null when not found or when the lookup fails.
+   */
+  static async findProductByCode(codigo: string): Promise<{ id: number; codigo: string; nome: string; situacao?: string } | null> {
+    const target = codigo?.trim();
+    if (!target) return null;
+
+    const params = new URLSearchParams();
+    params.append('codigos[]', target);
+    params.append('criterio', '5');
+
+    const response = await this.request(`/produtos?${params.toString()}`);
+    if (!response.ok) return null;
+
+    const result = await response.json();
+    const matches = (result.data || []).filter(
+      (p: any) => typeof p?.codigo === 'string' && p.codigo.trim().toUpperCase() === target.toUpperCase()
+    );
+    if (matches.length === 0) return null;
+
+    return matches.find((p: any) => p.situacao === 'A') || matches[0];
+  }
+
+  /**
+   * True when the error is Bling's validation error for an already-registered product code.
+   */
+  static isDuplicateCodeError(err: unknown): boolean {
+    if (!(err instanceof BlingApiError)) return false;
+    const fields = err.body?.error?.fields;
+    return Array.isArray(fields) && fields.some((f: any) => f?.element === 'codigo' && Number(f?.code) === 4);
   }
 
   /**
